@@ -1,0 +1,28 @@
+{
+  "name": "stock-management-backend",
+  "version": "1.0.0",
+  "description": "Backend service for Stock Management System (SCM Project)",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsc && node --watch dist/server.js",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "test": "node tests/run_tests.js",
+    "db:migrate": "node src/database/migrate.ts"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^2.4.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "@types/node": "^22.10.7",
+    "@types/express": "^5.0.0",
+    "@types/cors": "^2.8.17",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/bcryptjs": "^2.4.6"
+  }
+}

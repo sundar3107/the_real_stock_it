@@ -1,0 +1,12 @@
+﻿# Dependencies
+node_modules/
+dist/
+build/
+.env
+.env.local
+*.log
+*.db
+*.db-journal
+backend/data/*.db
+.vscode/
+.idea/

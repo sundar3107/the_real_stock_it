@@ -1,0 +1,17 @@
+﻿{
+  "name": "stock-management-system",
+  "version": "1.0.0",
+  "description": "Stock Management System for SCM Project - Incremental Implementation",
+  "scripts": {
+    "test": "npm run test --prefix backend",
+    "test:backend": "npm run test --prefix backend",
+    "build:backend": "npm run build --prefix backend",
+    "build:frontend": "npm run build --prefix frontend",
+    "build": "npm run build:backend && npm run build:frontend",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "start:backend": "npm run start --prefix backend"
+  },
+  "author": "Antigravity SCM Project",
+  "license": "ISC"
+}
