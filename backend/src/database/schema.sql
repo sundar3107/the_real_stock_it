@@ -1,4 +1,4 @@
-﻿-- Schema for Stock Management System (Module 1: Authentication, Module 2: Products, Module 3: Inventory)
+-- Schema for Stock Management System (Module 1: Authentication, Module 2: Products, Module 3: Inventory)
 
 -- Enable strict foreign key constraints
 PRAGMA foreign_keys = ON;
@@ -79,6 +79,38 @@ CREATE TABLE IF NOT EXISTS stock_transactions (
     FOREIGN KEY (performed_by) REFERENCES users(id) ON UPDATE CASCADE ON DELETE RESTRICT
 );
 
+-- Suppliers table: Master vendor / supplier registry
+CREATE TABLE IF NOT EXISTS suppliers (
+    id TEXT PRIMARY KEY,
+    supplier_name TEXT NOT NULL,
+    company_name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL COLLATE NOCASE,
+    phone TEXT NOT NULL,
+    alternate_phone TEXT,
+    address TEXT NOT NULL,
+    city TEXT NOT NULL,
+    state TEXT NOT NULL,
+    country TEXT NOT NULL,
+    postal_code TEXT NOT NULL,
+    tax_number TEXT,
+    contact_person TEXT NOT NULL,
+    notes TEXT,
+    status TEXT NOT NULL DEFAULT 'ACTIVE', -- 'ACTIVE', 'INACTIVE'
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Supplier Products table: Association between suppliers and products
+CREATE TABLE IF NOT EXISTS supplier_products (
+    id TEXT PRIMARY KEY,
+    supplier_id TEXT NOT NULL,
+    product_id TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(supplier_id, product_id),
+    FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON UPDATE CASCADE ON DELETE RESTRICT
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_role_id ON users(role_id);
@@ -91,3 +123,11 @@ CREATE INDEX IF NOT EXISTS idx_stock_trans_product_id ON stock_transactions(prod
 CREATE INDEX IF NOT EXISTS idx_stock_trans_type ON stock_transactions(transaction_type);
 CREATE INDEX IF NOT EXISTS idx_stock_trans_created_at ON stock_transactions(created_at);
 CREATE INDEX IF NOT EXISTS idx_stock_trans_performed_by ON stock_transactions(performed_by);
+CREATE INDEX IF NOT EXISTS idx_suppliers_supplier_name ON suppliers(supplier_name);
+CREATE INDEX IF NOT EXISTS idx_suppliers_company_name ON suppliers(company_name);
+CREATE INDEX IF NOT EXISTS idx_suppliers_email ON suppliers(email);
+CREATE INDEX IF NOT EXISTS idx_suppliers_status ON suppliers(status);
+CREATE INDEX IF NOT EXISTS idx_suppliers_city ON suppliers(city);
+CREATE INDEX IF NOT EXISTS idx_supplier_products_supplier_id ON supplier_products(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_supplier_products_product_id ON supplier_products(product_id);
+

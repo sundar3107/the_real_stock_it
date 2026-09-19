@@ -1,4 +1,4 @@
-﻿import { RoleModel } from '../models/Role';
+import { RoleModel } from '../models/Role';
 import { IRole, UserRole } from '../types/auth.types';
 
 /**
@@ -18,11 +18,13 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'inventory:read',
     'inventory:adjust',
     'inventory:manage',
+    'supplier:read',
     'report:inventory',
   ],
   SALES_MANAGER: [
     'product:read',
     'inventory:read',
+    'supplier:read',
     'customer:read',
     'customer:manage',
     'sales:read',
@@ -45,6 +47,7 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   VIEWER: [
     'product:read',
     'inventory:read',
+    'supplier:read',
     'sales:read',
     'purchase:read',
     'report:read',

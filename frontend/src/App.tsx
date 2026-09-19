@@ -9,6 +9,7 @@ import { WelcomeDashboardPage } from './modules/authentication/pages/WelcomeDash
 import { ProfilePage } from './modules/authentication/pages/ProfilePage';
 import { ProductsPage } from './modules/products/pages/ProductsPage';
 import { InventoryPage } from './modules/inventory/pages/InventoryPage';
+import { SuppliersPage } from './modules/suppliers/pages/SuppliersPage';
 
 export const App: React.FC = () => {
   return (
@@ -30,6 +31,7 @@ export const App: React.FC = () => {
             <Route path="/dashboard" element={<WelcomeDashboardPage />} />
             <Route path="/products" element={<ProductsPage />} />
             <Route path="/inventory" element={<InventoryPage />} />
+            <Route path="/suppliers" element={<SuppliersPage />} />
             <Route path="/profile" element={<ProfilePage />} />
           </Route>
 

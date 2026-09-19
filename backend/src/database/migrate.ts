@@ -1,4 +1,4 @@
-﻿import fs from 'fs';
+import fs from 'fs';
 import path from 'path';
 import bcrypt from 'bcryptjs';
 import { db } from './connection';
@@ -102,6 +102,89 @@ export function runMigrations() {
   `);
   syncInventoryStmt.run();
   console.log('[DB] Inventory balances initialized for products.');
+
+  // 5. Seed initial suppliers if none exist
+  const countSuppliersStmt = db.prepare('SELECT COUNT(*) as count FROM suppliers');
+  const supplierResult = countSuppliersStmt.get() as any;
+  const supplierCount = supplierResult ? supplierResult.count : 0;
+
+  if (supplierCount === 0) {
+    console.log('[DB] No suppliers found. Seeding standard suppliers...');
+    const defaultSuppliers = [
+      {
+        id: 'sup_prime_tech',
+        supplier_name: 'Prime Tech Distributors',
+        company_name: 'Prime Technologies Pvt Ltd',
+        email: 'sales@primetech.local',
+        phone: '+91 98765 43210',
+        alternate_phone: '+91 98765 43211',
+        address: '42 Industrial Tech Park, Electronic City',
+        city: 'Bengaluru',
+        state: 'Karnataka',
+        country: 'India',
+        postal_code: '560100',
+        tax_number: '29ABCDE1234F1Z5',
+        contact_person: 'Rajesh Sharma (Key Account Manager)',
+        notes: 'Primary hardware & electronics distributor. Standard lead time: 3-5 business days.',
+        status: 'ACTIVE',
+      },
+      {
+        id: 'sup_apex_stationery',
+        supplier_name: 'Apex Office Supplies & Paper',
+        company_name: 'Apex Global Logistics Inc',
+        email: 'orders@apexsupplies.local',
+        phone: '+91 91234 56789',
+        alternate_phone: null,
+        address: '77 Commerce Hub, Nariman Point',
+        city: 'Mumbai',
+        state: 'Maharashtra',
+        country: 'India',
+        postal_code: '400021',
+        tax_number: '27AABCA5678G2Z1',
+        contact_person: 'Pooja Varma (Procurement Head)',
+        notes: 'Bulk stationery, cartons, and paper supplier. Payment terms: Net 30.',
+        status: 'ACTIVE',
+      },
+      {
+        id: 'sup_global_raw',
+        supplier_name: 'Global Raw Materials Corp',
+        company_name: 'Global Polychem Materials Ltd',
+        email: 'contact@globalpolychem.local',
+        phone: '+91 99887 76655',
+        alternate_phone: null,
+        address: '104 GIDC Phase II, Vatva',
+        city: 'Ahmedabad',
+        state: 'Gujarat',
+        country: 'India',
+        postal_code: '382445',
+        tax_number: '24AAACG9988H1Z8',
+        contact_person: 'Amitabh Patel (Sales Director)',
+        notes: 'Polymers, packaging pellets, and industrial consumables supplier.',
+        status: 'ACTIVE',
+      },
+    ];
+
+    const insertSupStmt = db.prepare(`
+      INSERT INTO suppliers (
+        id, supplier_name, company_name, email, phone, alternate_phone,
+        address, city, state, country, postal_code, tax_number,
+        contact_person, notes, status, created_at, updated_at
+      ) VALUES (
+        ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, datetime('now'), datetime('now')
+      )
+    `);
+
+    for (const s of defaultSuppliers) {
+      insertSupStmt.run(
+        s.id, s.supplier_name, s.company_name, s.email, s.phone, s.alternate_phone,
+        s.address, s.city, s.state, s.country, s.postal_code, s.tax_number,
+        s.contact_person, s.notes, s.status
+      );
+    }
+    console.log('[DB] Standard suppliers seeded.');
+  }
 }
 
 // Allow direct execution

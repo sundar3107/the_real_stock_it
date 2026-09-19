@@ -771,6 +771,320 @@ async function runAllTests() {
       `Expected status 403 Forbidden, got ${viewerAdjustRes.status}`
     );
 
+    // ----------------------------------------------------
+    // MODULE 4: SUPPLIER MANAGEMENT TESTS (TESTS 36 - 47)
+    // ----------------------------------------------------
+    console.log('\n--- MODULE 4: SUPPLIER MANAGEMENT ---');
+
+    // Register a PURCHASE_MANAGER user
+    const purchaseUserEmail = `purchaser_${Date.now()}@stockit.local`;
+    const purchaseRegRes = await makeRequest(port, 'POST', '/api/auth/register', {
+      full_name: 'Procurement Officer',
+      email: purchaseUserEmail,
+      password: 'PurchasePass@2026',
+      confirm_password: 'PurchasePass@2026',
+      role: 'PURCHASE_MANAGER',
+    });
+    const purchaseManagerToken = purchaseRegRes.body?.data?.token;
+
+    // TEST 36: List suppliers and metrics query (Initial seed check)
+    const supListRes = await makeRequest(port, 'GET', '/api/suppliers', undefined, purchaseManagerToken);
+    const supMetricsRes = await makeRequest(port, 'GET', '/api/suppliers/metrics', undefined, purchaseManagerToken);
+    assert(
+      supListRes.status === 200 &&
+        supListRes.body.success === true &&
+        Array.isArray(supListRes.body.data.items) &&
+        supListRes.body.data.total >= 3 &&
+        supMetricsRes.status === 200 &&
+        supMetricsRes.body.data.total_suppliers >= 3,
+      'TEST 36: List suppliers & metrics query (Seeds loaded)',
+      `Expected status 200 with >= 3 suppliers, got total=${supListRes.body?.data?.total}`
+    );
+
+    // TEST 37: Create a valid supplier
+    const newSupEmail = `vendor_${Date.now()}@zenithenterprises.local`;
+    const createSupRes = await makeRequest(
+      port,
+      'POST',
+      '/api/suppliers',
+      {
+        supplier_name: 'Zenith Components Hub',
+        company_name: 'Zenith Logistics & Hardware LLP',
+        email: newSupEmail,
+        phone: '+91 94455 66778',
+        alternate_phone: '+91 94455 66779',
+        address: '55 Industrial Corridor, Peenya',
+        city: 'Bengaluru',
+        state: 'Karnataka',
+        country: 'India',
+        postal_code: '560058',
+        tax_number: '29ZZZAA1122B1Z9',
+        contact_person: 'Vikram Joshi (Senior VP)',
+        notes: 'Primary supplier for mechanical switches and custom plastic chassis.',
+        status: 'ACTIVE',
+      },
+      purchaseManagerToken
+    );
+    assert(
+      createSupRes.status === 201 &&
+        createSupRes.body.success === true &&
+        createSupRes.body.data.supplier_name === 'Zenith Components Hub' &&
+        createSupRes.body.data.status === 'ACTIVE',
+      'TEST 37: Create a valid supplier with contact and tax details',
+      `Expected status 201 Created, got ${createSupRes.status}`
+    );
+    const createdSupplierId = createSupRes.body?.data?.id;
+
+    // TEST 38: Required-field validation rejection
+    const invalidSupRes = await makeRequest(
+      port,
+      'POST',
+      '/api/suppliers',
+      {
+        supplier_name: '',
+        company_name: '',
+        email: 'missingfields@test.local',
+        phone: '',
+      },
+      purchaseManagerToken
+    );
+    assert(
+      invalidSupRes.status === 400 &&
+        invalidSupRes.body.errors &&
+        invalidSupRes.body.errors.supplier_name &&
+        invalidSupRes.body.errors.company_name &&
+        invalidSupRes.body.errors.phone,
+      'TEST 38: Reject supplier creation with missing required fields',
+      `Expected status 400 with field errors, got ${invalidSupRes.status}`
+    );
+
+    // TEST 39: Invalid email format rejection
+    const invalidEmailSupRes = await makeRequest(
+      port,
+      'POST',
+      '/api/suppliers',
+      {
+        supplier_name: 'Bad Email Vendor',
+        company_name: 'Bad Email Company',
+        email: 'not-a-valid-email',
+        phone: '+91 98765 00000',
+        address: 'Some Address',
+        city: 'Pune',
+        state: 'Maharashtra',
+        country: 'India',
+        postal_code: '411001',
+        contact_person: 'Tester',
+      },
+      purchaseManagerToken
+    );
+    assert(
+      invalidEmailSupRes.status === 400 &&
+        invalidEmailSupRes.body.errors &&
+        invalidEmailSupRes.body.errors.email,
+      'TEST 39: Reject invalid email format during supplier registration',
+      `Expected status 400 with email format error, got ${invalidEmailSupRes.status}`
+    );
+
+    // TEST 40: Duplicate supplier email rejection
+    const dupSupRes = await makeRequest(
+      port,
+      'POST',
+      '/api/suppliers',
+      {
+        supplier_name: 'Duplicate Vendor',
+        company_name: 'Duplicate Vendor Inc',
+        email: newSupEmail, // Duplicate
+        phone: '+91 91111 22222',
+        address: 'Some Address',
+        city: 'Bengaluru',
+        state: 'Karnataka',
+        country: 'India',
+        postal_code: '560001',
+        contact_person: 'Duplication Tester',
+      },
+      purchaseManagerToken
+    );
+    assert(
+      dupSupRes.status === 409 && dupSupRes.body.success === false,
+      'TEST 40: Reject duplicate supplier email (409 Conflict)',
+      `Expected status 409 Conflict, got ${dupSupRes.status}`
+    );
+
+    // TEST 41: Edit / update supplier details
+    const updateSupRes = await makeRequest(
+      port,
+      'PUT',
+      `/api/suppliers/${createdSupplierId}`,
+      {
+        supplier_name: 'Zenith Components Hub (Updated)',
+        contact_person: 'Vikram Joshi (Executive VP)',
+        notes: 'Updated terms: Fast-track 2-day delivery on express orders.',
+      },
+      purchaseManagerToken
+    );
+    assert(
+      updateSupRes.status === 200 &&
+        updateSupRes.body.success === true &&
+        updateSupRes.body.data.supplier_name === 'Zenith Components Hub (Updated)' &&
+        updateSupRes.body.data.contact_person === 'Vikram Joshi (Executive VP)',
+      'TEST 41: Edit / update supplier details',
+      `Expected status 200 with updated fields, got ${updateSupRes.status}`
+    );
+
+    // TEST 42: Get supplier details by ID
+    const getSupDetailsRes = await makeRequest(
+      port,
+      'GET',
+      `/api/suppliers/${createdSupplierId}`,
+      undefined,
+      purchaseManagerToken
+    );
+    assert(
+      getSupDetailsRes.status === 200 &&
+        getSupDetailsRes.body.success === true &&
+        getSupDetailsRes.body.data.id === createdSupplierId &&
+        Array.isArray(getSupDetailsRes.body.data.products) &&
+        Array.isArray(getSupDetailsRes.body.data.purchase_history),
+      'TEST 42: Get supplier details by ID (with products & future placeholder)',
+      `Expected status 200 with supplier details, got ${getSupDetailsRes.status}`
+    );
+
+    // TEST 43: Search suppliers
+    const searchSupRes = await makeRequest(
+      port,
+      'GET',
+      '/api/suppliers?search=Zenith',
+      undefined,
+      purchaseManagerToken
+    );
+    assert(
+      searchSupRes.status === 200 &&
+        searchSupRes.body.data.items.length >= 1 &&
+        searchSupRes.body.data.items.some((s) => s.id === createdSupplierId),
+      'TEST 43: Search suppliers by query string',
+      `Expected search to find created supplier, got count=${searchSupRes.body?.data?.items?.length}`
+    );
+
+    // TEST 44: Filter suppliers by status
+    const filterActiveRes = await makeRequest(
+      port,
+      'GET',
+      '/api/suppliers?status=ACTIVE',
+      undefined,
+      purchaseManagerToken
+    );
+    assert(
+      filterActiveRes.status === 200 &&
+        filterActiveRes.body.data.items.every((s) => s.status === 'ACTIVE'),
+      'TEST 44: Filter suppliers by status=ACTIVE',
+      `Expected all items to have ACTIVE status, got status=${filterActiveRes.status}`
+    );
+
+    // TEST 45: Activate / Deactivate supplier (Soft-deactivation)
+    const deactSupRes = await makeRequest(
+      port,
+      'PATCH',
+      `/api/suppliers/${createdSupplierId}/status`,
+      { status: 'INACTIVE' },
+      purchaseManagerToken
+    );
+    const getDeactSupRes = await makeRequest(
+      port,
+      'GET',
+      `/api/suppliers/${createdSupplierId}`,
+      undefined,
+      purchaseManagerToken
+    );
+    assert(
+      deactSupRes.status === 200 &&
+        getDeactSupRes.status === 200 &&
+        getDeactSupRes.body.data.status === 'INACTIVE',
+      'TEST 45: Soft-deactivate supplier (Active -> Inactive)',
+      `Expected status INACTIVE, got ${getDeactSupRes.body?.data?.status}`
+    );
+
+    // Reactivate for relationship test
+    await makeRequest(
+      port,
+      'PATCH',
+      `/api/suppliers/${createdSupplierId}/status`,
+      { status: 'ACTIVE' },
+      purchaseManagerToken
+    );
+
+    // TEST 46: Associate product with supplier
+    const associateRes = await makeRequest(
+      port,
+      'POST',
+      `/api/suppliers/${createdSupplierId}/products`,
+      { product_ids: [testInvProductId] },
+      purchaseManagerToken
+    );
+    const supProductsRes = await makeRequest(
+      port,
+      'GET',
+      `/api/suppliers/${createdSupplierId}/products`,
+      undefined,
+      purchaseManagerToken
+    );
+    assert(
+      associateRes.status === 200 &&
+        associateRes.body.success === true &&
+        supProductsRes.status === 200 &&
+        supProductsRes.body.data.some((p) => p.product_id === testInvProductId),
+      'TEST 46: Associate product with supplier and retrieve linked products',
+      `Expected product linked to supplier, got count=${supProductsRes.body?.data?.length}`
+    );
+
+    // TEST 47: Disassociate product from supplier
+    const disassociateRes = await makeRequest(
+      port,
+      'DELETE',
+      `/api/suppliers/${createdSupplierId}/products/${testInvProductId}`,
+      undefined,
+      purchaseManagerToken
+    );
+    const supProductsAfterRes = await makeRequest(
+      port,
+      'GET',
+      `/api/suppliers/${createdSupplierId}/products`,
+      undefined,
+      purchaseManagerToken
+    );
+    assert(
+      disassociateRes.status === 200 &&
+        disassociateRes.body.success === true &&
+        supProductsAfterRes.status === 200 &&
+        !supProductsAfterRes.body.data.some((p) => p.product_id === testInvProductId),
+      'TEST 47: Disassociate product from supplier',
+      `Expected product removed from supplier, got count=${supProductsAfterRes.body?.data?.length}`
+    );
+
+    // TEST 48: Role-based authorization on Suppliers
+    const viewerCreateSupRes = await makeRequest(
+      port,
+      'POST',
+      '/api/suppliers',
+      {
+        supplier_name: 'Unauthorized Supplier',
+        company_name: 'Unauthorized Inc',
+        email: 'unauth@supplier.local',
+        phone: '+91 99999 88888',
+        address: 'No Address',
+        city: 'Delhi',
+        state: 'Delhi',
+        country: 'India',
+        postal_code: '110001',
+        contact_person: 'Unauthorized Person',
+      },
+      viewerToken
+    );
+    assert(
+      viewerCreateSupRes.status === 403,
+      'TEST 48: Role-based authorization (VIEWER is forbidden from creating/modifying suppliers)',
+      `Expected status 403 Forbidden, got ${viewerCreateSupRes.status}`
+    );
+
   } finally {
     server.close();
   }
