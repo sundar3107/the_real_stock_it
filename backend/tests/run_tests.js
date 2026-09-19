@@ -1,4 +1,4 @@
-﻿const http = require('http');
+const http = require('http');
 const path = require('path');
 const { createApp } = require('../dist/app');
 const { runMigrations } = require('../dist/database/migrate');
@@ -509,6 +509,266 @@ async function runAllTests() {
       viewerReadRes.status === 200 && viewerCreateRes.status === 403,
       'TEST 24: Role-based authorization enforcement (VIEWER can read, denied on create)',
       `Expected read=200 and create=403, got read=${viewerReadRes.status}, create=${viewerCreateRes.status}`
+    );
+
+    // ----------------------------------------------------
+    // MODULE 3: INVENTORY MANAGEMENT TESTS (TESTS 25 - 35)
+    // ----------------------------------------------------
+    console.log('\n--- MODULE 3: INVENTORY MANAGEMENT & AUDIT LEDGER ---');
+
+    // Create a new dedicated active product for stock testing
+    const invProdRes = await makeRequest(
+      port,
+      'POST',
+      '/api/products',
+      {
+        name: 'Inventory Test Widget',
+        sku: `INV-TEST-${Date.now()}`,
+        category_id: createdCategoryId,
+        unit: 'pcs',
+        purchase_price: 150,
+        selling_price: 250,
+        opening_stock: 40,
+        reorder_level: 15,
+      },
+      inventoryManagerToken
+    );
+    const testInvProductId = invProdRes.body?.data?.id;
+
+    // TEST 25: Initial Inventory Balance & Metrics
+    const metricsRes = await makeRequest(port, 'GET', '/api/inventory/metrics', undefined, inventoryManagerToken);
+    const itemStockRes = await makeRequest(
+      port,
+      'GET',
+      `/api/inventory/item/${testInvProductId}`,
+      undefined,
+      inventoryManagerToken
+    );
+    assert(
+      metricsRes.status === 200 &&
+        metricsRes.body.success === true &&
+        typeof metricsRes.body.data.total_items === 'number' &&
+        itemStockRes.status === 200 &&
+        itemStockRes.body.data.current_quantity === 40 &&
+        itemStockRes.body.data.stock_status === 'IN_STOCK',
+      'TEST 25: Initial inventory balance auto-sync & metrics query',
+      `Expected 40 stock units and IN_STOCK, got status=${itemStockRes.status}, qty=${itemStockRes.body?.data?.current_quantity}`
+    );
+
+    // TEST 26: Valid Stock IN
+    const stockInRes = await makeRequest(
+      port,
+      'POST',
+      '/api/inventory/stock-in',
+      {
+        product_id: testInvProductId,
+        quantity: 20,
+        reference: 'GRN-2026-001',
+        reason: 'Received supplier shipment batch A1',
+      },
+      inventoryManagerToken
+    );
+    assert(
+      (stockInRes.status === 200 || stockInRes.status === 201) &&
+        stockInRes.body.success === true &&
+        stockInRes.body.data.inventory.current_quantity === 60 &&
+        stockInRes.body.data.transaction.transaction_type === 'STOCK_IN' &&
+        stockInRes.body.data.transaction.previous_quantity === 40 &&
+        stockInRes.body.data.transaction.new_quantity === 60 &&
+        stockInRes.body.data.transaction.quantity === 20,
+      'TEST 26: Valid Stock IN (Balance increments 40 -> 60, transaction ledger created)',
+      `Expected status 200/201 with new_quantity=60, got ${stockInRes.status}, qty=${stockInRes.body?.data?.inventory?.current_quantity}`
+    );
+
+    // TEST 27: Valid Stock OUT
+    const stockOutRes = await makeRequest(
+      port,
+      'POST',
+      '/api/inventory/stock-out',
+      {
+        product_id: testInvProductId,
+        quantity: 15,
+        reference: 'DISP-2026-001',
+        reason: 'Dispatched to branch retail store',
+      },
+      inventoryManagerToken
+    );
+    assert(
+      stockOutRes.status === 200 &&
+        stockOutRes.body.success === true &&
+        stockOutRes.body.data.inventory.current_quantity === 45 &&
+        stockOutRes.body.data.transaction.transaction_type === 'STOCK_OUT' &&
+        stockOutRes.body.data.transaction.previous_quantity === 60 &&
+        stockOutRes.body.data.transaction.new_quantity === 45,
+      'TEST 27: Valid Stock OUT (Balance decrements 60 -> 45, transaction ledger created)',
+      `Expected status 200 with new_quantity=45, got ${stockOutRes.status}, qty=${stockOutRes.body?.data?.inventory?.current_quantity}`
+    );
+
+    // TEST 28: Stock OUT rejection on Insufficient Stock
+    const overIssueRes = await makeRequest(
+      port,
+      'POST',
+      '/api/inventory/stock-out',
+      {
+        product_id: testInvProductId,
+        quantity: 1000,
+        reference: 'DISP-OVER-999',
+        reason: 'Attempting to issue more than available',
+      },
+      inventoryManagerToken
+    );
+    assert(
+      overIssueRes.status === 400 &&
+        overIssueRes.body.success === false &&
+        overIssueRes.body.message.toLowerCase().includes('insufficient'),
+      'TEST 28: Stock OUT rejection on Insufficient Stock (Negative stock prevention)',
+      `Expected status 400 with Insufficient stock message, got ${overIssueRes.status}`
+    );
+
+    // TEST 29: Stock Adjustment - INCREASE
+    const adjustIncRes = await makeRequest(
+      port,
+      'POST',
+      '/api/inventory/adjust',
+      {
+        product_id: testInvProductId,
+        adjustment_type: 'INCREASE',
+        quantity: 5,
+        reason: 'Physical count found 5 extra units during routine audit',
+        reference: 'AUDIT-INC-01',
+      },
+      inventoryManagerToken
+    );
+    assert(
+      adjustIncRes.status === 200 &&
+        adjustIncRes.body.success === true &&
+        adjustIncRes.body.data.inventory.current_quantity === 50 &&
+        adjustIncRes.body.data.transaction.transaction_type === 'ADJUSTMENT',
+      'TEST 29: Stock Adjustment - INCREASE (45 -> 50)',
+      `Expected status 200 with new_quantity=50, got ${adjustIncRes.status}`
+    );
+
+    // TEST 30: Stock Adjustment - DECREASE
+    const adjustDecRes = await makeRequest(
+      port,
+      'POST',
+      '/api/inventory/adjust',
+      {
+        product_id: testInvProductId,
+        adjustment_type: 'DECREASE',
+        quantity: 10,
+        reason: 'Scrapped 10 units broken in handling',
+        reference: 'SCRAP-001',
+      },
+      inventoryManagerToken
+    );
+    assert(
+      adjustDecRes.status === 200 &&
+        adjustDecRes.body.success === true &&
+        adjustDecRes.body.data.inventory.current_quantity === 40 &&
+        adjustDecRes.body.data.transaction.transaction_type === 'ADJUSTMENT',
+      'TEST 30: Stock Adjustment - DECREASE (50 -> 40)',
+      `Expected status 200 with new_quantity=40, got ${adjustDecRes.status}`
+    );
+
+    // TEST 31: Stock Adjustment - SET_QUANTITY exact count
+    const adjustSetRes = await makeRequest(
+      port,
+      'POST',
+      '/api/inventory/adjust',
+      {
+        product_id: testInvProductId,
+        adjustment_type: 'SET_QUANTITY',
+        quantity: 12, // Lower than reorder_level (15)
+        reason: 'Annual inventory reconciliation absolute count',
+        reference: 'RECON-2026',
+      },
+      inventoryManagerToken
+    );
+    assert(
+      adjustSetRes.status === 200 &&
+        adjustSetRes.body.success === true &&
+        adjustSetRes.body.data.inventory.current_quantity === 12 &&
+        adjustSetRes.body.data.inventory.stock_status === 'LOW_STOCK',
+      'TEST 31: Stock Adjustment - SET_QUANTITY (Sets 12, triggers LOW_STOCK status)',
+      `Expected status 200 with new_quantity=12 and LOW_STOCK, got qty=${adjustSetRes.body?.data?.inventory?.current_quantity}, status=${adjustSetRes.body?.data?.inventory?.stock_status}`
+    );
+
+    // TEST 32: Stock Adjustment validation - Missing mandatory reason rejection
+    const missingReasonRes = await makeRequest(
+      port,
+      'POST',
+      '/api/inventory/adjust',
+      {
+        product_id: testInvProductId,
+        adjustment_type: 'INCREASE',
+        quantity: 10,
+        reason: '   ',
+      },
+      inventoryManagerToken
+    );
+    assert(
+      missingReasonRes.status === 400 && missingReasonRes.body.errors && missingReasonRes.body.errors.reason,
+      'TEST 32: Stock Adjustment validation (Enforces mandatory audit reason)',
+      `Expected status 400 with reason validation error, got ${missingReasonRes.status}`
+    );
+
+    // TEST 33: Stock Status transitions (Healthy -> Low Stock -> Out of Stock)
+    const zeroOutRes = await makeRequest(
+      port,
+      'POST',
+      '/api/inventory/adjust',
+      {
+        product_id: testInvProductId,
+        adjustment_type: 'SET_QUANTITY',
+        quantity: 0,
+        reason: 'Completely written off for disposal',
+      },
+      inventoryManagerToken
+    );
+    assert(
+      zeroOutRes.status === 200 &&
+        zeroOutRes.body.data.inventory.current_quantity === 0 &&
+        zeroOutRes.body.data.inventory.stock_status === 'OUT_OF_STOCK',
+      'TEST 33: Stock Status transition to OUT_OF_STOCK on quantity = 0',
+      `Expected OUT_OF_STOCK status, got ${zeroOutRes.body?.data?.inventory?.stock_status}`
+    );
+
+    // TEST 34: Immutable Transaction Audit Ledger Query
+    const transactionsRes = await makeRequest(
+      port,
+      'GET',
+      `/api/inventory/transactions?product_id=${testInvProductId}&limit=20`,
+      undefined,
+      inventoryManagerToken
+    );
+    assert(
+      transactionsRes.status === 200 &&
+        transactionsRes.body.success === true &&
+        Array.isArray(transactionsRes.body.data.items) &&
+        transactionsRes.body.data.items.length >= 5 &&
+        transactionsRes.body.data.items.every((t) => t.product_id === testInvProductId),
+      'TEST 34: Immutable Transaction Audit Ledger query with filtering',
+      `Expected >= 5 transaction records for product, got ${transactionsRes.body?.data?.items?.length}`
+    );
+
+    // TEST 35: Inventory Role-Based Access Control
+    const viewerAdjustRes = await makeRequest(
+      port,
+      'POST',
+      '/api/inventory/adjust',
+      {
+        product_id: testInvProductId,
+        adjustment_type: 'INCREASE',
+        quantity: 10,
+        reason: 'Viewer unauthorized attempt',
+      },
+      viewerToken
+    );
+    assert(
+      viewerAdjustRes.status === 403,
+      'TEST 35: Role-based authorization on Inventory operations (VIEWER forbidden from adjusting stock)',
+      `Expected status 403 Forbidden, got ${viewerAdjustRes.status}`
     );
 
   } finally {

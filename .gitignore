@@ -1,4 +1,4 @@
-﻿# Dependencies
+# Dependencies
 node_modules/
 dist/
 build/
@@ -6,7 +6,9 @@ build/
 .env.local
 *.log
 *.db
+*.sqlite
 *.db-journal
 backend/data/*.db
+backend/data/*.sqlite
 .vscode/
 .idea/

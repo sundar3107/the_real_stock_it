@@ -1,4 +1,4 @@
-﻿-- Schema for Stock Management System (Module 1: Authentication & Module 2: Products)
+﻿-- Schema for Stock Management System (Module 1: Authentication, Module 2: Products, Module 3: Inventory)
 
 -- Enable strict foreign key constraints
 PRAGMA foreign_keys = ON;
@@ -53,6 +53,32 @@ CREATE TABLE IF NOT EXISTS products (
     FOREIGN KEY (category_id) REFERENCES categories(id) ON UPDATE CASCADE ON DELETE RESTRICT
 );
 
+-- Inventory table: Authoritative current stock balances
+CREATE TABLE IF NOT EXISTS inventory (
+    id TEXT PRIMARY KEY,
+    product_id TEXT UNIQUE NOT NULL,
+    current_quantity INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (product_id) REFERENCES products(id) ON UPDATE CASCADE ON DELETE RESTRICT
+);
+
+-- Stock Transactions table: Immutable audit ledger for every stock movement
+CREATE TABLE IF NOT EXISTS stock_transactions (
+    id TEXT PRIMARY KEY,
+    product_id TEXT NOT NULL,
+    transaction_type TEXT NOT NULL, -- 'STOCK_IN', 'STOCK_OUT', 'ADJUSTMENT'
+    quantity INTEGER NOT NULL,      -- absolute magnitude of stock change
+    previous_quantity INTEGER NOT NULL,
+    new_quantity INTEGER NOT NULL,
+    reason TEXT NOT NULL,
+    reference TEXT,
+    performed_by TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (product_id) REFERENCES products(id) ON UPDATE CASCADE ON DELETE RESTRICT,
+    FOREIGN KEY (performed_by) REFERENCES users(id) ON UPDATE CASCADE ON DELETE RESTRICT
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_role_id ON users(role_id);
@@ -60,3 +86,8 @@ CREATE INDEX IF NOT EXISTS idx_categories_name ON categories(name);
 CREATE INDEX IF NOT EXISTS idx_products_sku ON products(sku);
 CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);
 CREATE INDEX IF NOT EXISTS idx_products_category_id ON products(category_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_product_id ON inventory(product_id);
+CREATE INDEX IF NOT EXISTS idx_stock_trans_product_id ON stock_transactions(product_id);
+CREATE INDEX IF NOT EXISTS idx_stock_trans_type ON stock_transactions(transaction_type);
+CREATE INDEX IF NOT EXISTS idx_stock_trans_created_at ON stock_transactions(created_at);
+CREATE INDEX IF NOT EXISTS idx_stock_trans_performed_by ON stock_transactions(performed_by);

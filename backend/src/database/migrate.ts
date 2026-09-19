@@ -86,6 +86,22 @@ export function runMigrations() {
     }
     console.log('[DB] Default categories seeded.');
   }
+
+  // 4. Initialize inventory records for products that do not have an inventory record
+  const syncInventoryStmt = db.prepare(`
+    INSERT INTO inventory (id, product_id, current_quantity, created_at, updated_at)
+    SELECT 
+      'inv_' || p.id,
+      p.id,
+      COALESCE(p.opening_stock, 0),
+      datetime('now'),
+      datetime('now')
+    FROM products p
+    LEFT JOIN inventory inv ON p.id = inv.product_id
+    WHERE inv.id IS NULL
+  `);
+  syncInventoryStmt.run();
+  console.log('[DB] Inventory balances initialized for products.');
 }
 
 // Allow direct execution

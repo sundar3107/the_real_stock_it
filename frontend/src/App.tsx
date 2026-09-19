@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './modules/authentication/context/AuthContext';
 import { ProtectedRoute } from './modules/authentication/components/ProtectedRoute';
@@ -8,6 +8,7 @@ import { RegisterPage } from './modules/authentication/pages/RegisterPage';
 import { WelcomeDashboardPage } from './modules/authentication/pages/WelcomeDashboardPage';
 import { ProfilePage } from './modules/authentication/pages/ProfilePage';
 import { ProductsPage } from './modules/products/pages/ProductsPage';
+import { InventoryPage } from './modules/inventory/pages/InventoryPage';
 
 export const App: React.FC = () => {
   return (
@@ -28,6 +29,7 @@ export const App: React.FC = () => {
           >
             <Route path="/dashboard" element={<WelcomeDashboardPage />} />
             <Route path="/products" element={<ProductsPage />} />
+            <Route path="/inventory" element={<InventoryPage />} />
             <Route path="/profile" element={<ProfilePage />} />
           </Route>
 
