@@ -2,6 +2,8 @@
 import cors from 'cors';
 import { config } from './config/env';
 import authRoutes from './modules/authentication/routes/authRoutes';
+import productRoutes from './modules/products/routes/productRoutes';
+import categoryRoutes from './modules/products/routes/categoryRoutes';
 import { errorHandler } from './middleware/errorHandler';
 
 export function createApp(): Application {
@@ -21,12 +23,14 @@ export function createApp(): Application {
       status: 'OK',
       timestamp: new Date().toISOString(),
       service: 'Stock Management System API',
-      module: 'Module 1: User Authentication & Management',
+      module: 'Module 1: User Authentication & Module 2: Product Management',
     });
   });
 
   // Module Routes
   app.use('/api/auth', authRoutes);
+  app.use('/api/products', productRoutes);
+  app.use('/api/categories', categoryRoutes);
 
   // Catch-all 404 handler for unrecognized routes
   app.use((req: Request, res: Response) => {

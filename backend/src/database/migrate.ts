@@ -15,7 +15,7 @@ export function runMigrations() {
   db.exec(schemaSql);
   console.log('[DB] Schema verified.');
 
-  // Seed standard roles if not existing
+  // 1. Seed standard roles if not existing
   const roles = [
     { id: 'role_admin', name: 'ADMIN', description: 'Full system administration and user management' },
     { id: 'role_inventory', name: 'INVENTORY_MANAGER', description: 'Manage products, stock tracking, and adjustments' },
@@ -35,7 +35,7 @@ export function runMigrations() {
   }
   console.log('[DB] Core roles seeded.');
 
-  // Seed default admin user if no users exist
+  // 2. Seed default admin user if no users exist
   const countUsersStmt = db.prepare('SELECT COUNT(*) as count FROM users');
   const result = countUsersStmt.get() as any;
   const count = result ? result.count : 0;
@@ -58,6 +58,33 @@ export function runMigrations() {
       'ACTIVE'
     );
     console.log('[DB] Default admin seeded: admin@stockit.local / Admin@123456');
+  }
+
+  // 3. Seed initial standard categories if none exist
+  const countCategoriesStmt = db.prepare('SELECT COUNT(*) as count FROM categories');
+  const catResult = countCategoriesStmt.get() as any;
+  const catCount = catResult ? catResult.count : 0;
+
+  if (catCount === 0) {
+    console.log('[DB] No categories found. Seeding standard product categories...');
+    const defaultCategories = [
+      { id: 'cat_electronics', name: 'Electronics', description: 'Electronic devices, accessories, and components' },
+      { id: 'cat_office', name: 'Office Supplies', description: 'Stationery, paper, desk supplies, and office materials' },
+      { id: 'cat_raw', name: 'Raw Materials', description: 'Production and manufacturing inputs' },
+      { id: 'cat_packaging', name: 'Packaging', description: 'Boxes, bubble wrap, tape, and shipping materials' },
+      { id: 'cat_finished', name: 'Finished Goods', description: 'Ready-to-sell inventory items' },
+    ];
+
+    const insertCatStmt = db.prepare(`
+      INSERT INTO categories (id, name, description, status, created_at, updated_at)
+      VALUES (?, ?, ?, 'ACTIVE', datetime('now'), datetime('now'))
+      ON CONFLICT(name) DO NOTHING
+    `);
+
+    for (const cat of defaultCategories) {
+      insertCatStmt.run(cat.id, cat.name, cat.description);
+    }
+    console.log('[DB] Default categories seeded.');
   }
 }
 

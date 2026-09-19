@@ -1,13 +1,14 @@
 ﻿import React from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { Header } from './Header';
-import { LayoutDashboard, UserCheck, Layers } from 'lucide-react';
+import { LayoutDashboard, Package, UserCheck, Layers } from 'lucide-react';
 
 export const AppLayout: React.FC = () => {
   const location = useLocation();
 
   const navigationItems = [
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+    { label: 'Products', path: '/products', icon: Package },
     { label: 'My Profile', path: '/profile', icon: UserCheck },
   ];
 
@@ -16,7 +17,7 @@ export const AppLayout: React.FC = () => {
       <Header />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex-1 flex flex-col md:flex-row gap-6">
-        {/* Navigation Sidebar Placeholder */}
+        {/* Navigation Sidebar */}
         <aside className="w-full md:w-64 flex-shrink-0">
           <nav className="bg-white rounded-xl shadow-sm border border-slate-200 p-3 space-y-1">
             <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
@@ -25,7 +26,7 @@ export const AppLayout: React.FC = () => {
 
             {navigationItems.map((item) => {
               const Icon = item.icon;
-              const isActive = location.pathname === item.path;
+              const isActive = location.pathname.startsWith(item.path);
               return (
                 <Link
                   key={item.path}
@@ -49,7 +50,7 @@ export const AppLayout: React.FC = () => {
                 <span>Upcoming SCM Modules</span>
               </div>
               <div className="px-3 py-1 text-xs text-slate-400 italic">
-                Products, Inventory, Suppliers, Customers & Orders will link here in future modules.
+                Inventory, Suppliers, Customers, Purchases & Sales will link here in future modules.
               </div>
             </div>
           </nav>
@@ -62,7 +63,7 @@ export const AppLayout: React.FC = () => {
       </div>
 
       <footer className="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
-        Stock Management System &bull; SCM Project Baseline &bull; Module 1: Authentication & User Management
+        Stock Management System &bull; SCM Project Baseline &bull; Module 2: Product / Item Management
       </footer>
     </div>
   );
