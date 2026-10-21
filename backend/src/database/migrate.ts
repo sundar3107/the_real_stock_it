@@ -185,6 +185,86 @@ export function runMigrations() {
     }
     console.log('[DB] Standard suppliers seeded.');
   }
+
+  // 6. Seed default customers if none exist
+  const countCustStmt = db.prepare('SELECT COUNT(*) as count FROM customers');
+  const custResult = countCustStmt.get() as any;
+  const custCount = custResult ? custResult.count : 0;
+
+  if (custCount === 0) {
+    console.log('[DB] No customers found. Seeding standard customers...');
+    const defaultCustomers = [
+      {
+        id: 'cust_apex_retail',
+        customer_name: 'Priya Sharma',
+        company_name: 'Apex Retail Solutions',
+        email: 'priya.sharma@apexretail.local',
+        phone: '+91 98450 12345',
+        alternate_phone: '+91 98450 12346',
+        address: '12 Brigade Road, Ashok Nagar',
+        city: 'Bengaluru',
+        state: 'Karnataka',
+        country: 'India',
+        postal_code: '560025',
+        tax_number: '29AAAAA0000A1Z5',
+        notes: 'Premium commercial client. Preferred payment terms: Net 15.',
+        status: 'ACTIVE',
+      },
+      {
+        id: 'cust_nexus_tech',
+        customer_name: 'Rahul Deshmukh',
+        company_name: 'Nexus Technologies Pvt Ltd',
+        email: 'rahul.d@nexustech.local',
+        phone: '+91 97654 32100',
+        alternate_phone: null,
+        address: '801 Infinity IT Park, Malad West',
+        city: 'Mumbai',
+        state: 'Maharashtra',
+        country: 'India',
+        postal_code: '400064',
+        tax_number: '27BBBBB1111B1Z2',
+        notes: 'Corporate electronics & peripherals bulk buyer.',
+        status: 'ACTIVE',
+      },
+      {
+        id: 'cust_metro_super',
+        customer_name: 'Sunita Nair',
+        company_name: 'Metro Retail Mart Ltd',
+        email: 'sunita.nair@metromart.local',
+        phone: '+91 94440 98765',
+        alternate_phone: null,
+        address: '45 Mount Road, T. Nagar',
+        city: 'Chennai',
+        state: 'Tamil Nadu',
+        country: 'India',
+        postal_code: '600017',
+        tax_number: '33CCCCC2222C1Z9',
+        notes: 'Weekly packaging and consumables orders.',
+        status: 'ACTIVE',
+      },
+    ];
+
+    const insertCustStmt = db.prepare(`
+      INSERT INTO customers (
+        id, customer_name, company_name, email, phone, alternate_phone,
+        address, city, state, country, postal_code, tax_number,
+        notes, status, created_at, updated_at
+      ) VALUES (
+        ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?,
+        ?, ?, datetime('now'), datetime('now')
+      )
+    `);
+
+    for (const c of defaultCustomers) {
+      insertCustStmt.run(
+        c.id, c.customer_name, c.company_name, c.email, c.phone, c.alternate_phone,
+        c.address, c.city, c.state, c.country, c.postal_code, c.tax_number,
+        c.notes, c.status
+      );
+    }
+    console.log('[DB] Standard customers seeded.');
+  }
 }
 
 // Allow direct execution

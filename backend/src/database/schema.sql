@@ -131,3 +131,32 @@ CREATE INDEX IF NOT EXISTS idx_suppliers_city ON suppliers(city);
 CREATE INDEX IF NOT EXISTS idx_supplier_products_supplier_id ON supplier_products(supplier_id);
 CREATE INDEX IF NOT EXISTS idx_supplier_products_product_id ON supplier_products(product_id);
 
+
+
+-- Customers table: Master customer directory for outbound sales
+CREATE TABLE IF NOT EXISTS customers (
+    id TEXT PRIMARY KEY,
+    customer_name TEXT NOT NULL,
+    company_name TEXT,
+    email TEXT UNIQUE NOT NULL COLLATE NOCASE,
+    phone TEXT NOT NULL,
+    alternate_phone TEXT,
+    address TEXT NOT NULL,
+    city TEXT NOT NULL,
+    state TEXT NOT NULL,
+    country TEXT NOT NULL,
+    postal_code TEXT NOT NULL,
+    tax_number TEXT,
+    notes TEXT,
+    status TEXT NOT NULL DEFAULT 'ACTIVE', -- 'ACTIVE', 'INACTIVE'
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_customers_customer_name ON customers(customer_name);
+CREATE INDEX IF NOT EXISTS idx_customers_company_name ON customers(company_name);
+CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email);
+CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
+CREATE INDEX IF NOT EXISTS idx_customers_status ON customers(status);
+CREATE INDEX IF NOT EXISTS idx_customers_city ON customers(city);
+CREATE INDEX IF NOT EXISTS idx_customers_state ON customers(state);

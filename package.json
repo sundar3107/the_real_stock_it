@@ -1,8 +1,9 @@
-﻿{
+{
   "name": "stock-management-system",
   "version": "1.0.0",
   "description": "Stock Management System for SCM Project - Incremental Implementation",
   "scripts": {
+    "dev": "node scripts/dev.js",
     "test": "npm run test --prefix backend",
     "test:backend": "npm run test --prefix backend",
     "build:backend": "npm run build --prefix backend",

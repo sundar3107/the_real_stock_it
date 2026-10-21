@@ -19,6 +19,7 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'inventory:adjust',
     'inventory:manage',
     'supplier:read',
+    'customer:read',
     'report:inventory',
   ],
   SALES_MANAGER: [
@@ -39,6 +40,7 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'inventory:read',
     'supplier:read',
     'supplier:manage',
+    'customer:read',
     'purchase:read',
     'purchase:create',
     'purchase:approve',
@@ -48,6 +50,7 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'product:read',
     'inventory:read',
     'supplier:read',
+    'customer:read',
     'sales:read',
     'purchase:read',
     'report:read',

@@ -2,8 +2,8 @@
 
 > **Target Audience:** Incoming Software Engineer / AI Agent in Google Antigravity.  
 > **Repository Root:** `d:/the_real_stock_it/`  
-> **Status:** Modules 1 through 4 are **100% completed, tested, and verified** (48/48 automated tests passing).  
-> **Next Module in Queue:** **Module 5: Customer Management**.
+> **Status:** Modules 1 through 5 are **100% completed, tested, and verified** (59/59 automated tests passing).  
+> **Next Module in Queue:** **Module 6: Purchase Management**.
 
 ---
 
@@ -15,9 +15,9 @@ This project is a web-based **Stock Management System** developed as part of a *
 1. **Incremental, Strict Modular Development**: Each module is implemented sequentially in isolation without modifying or regressing previous modules.
 2. **High Cohesion, Low Coupling**: Modules communicate through clean, explicit service boundaries and join tables. Domain logic is strictly encapsulated within its own module folder.
 3. **Traceability & Auditability**:
-   - No hard deletes for master entities (products, suppliers, users). Soft-deactivations transition status to `INACTIVE`.
+   - No hard deletes for master entities (products, suppliers, customers, users). Soft-deactivations transition status to `INACTIVE`.
    - All physical inventory balance modifications record immutable rows in `stock_transactions` with actor ID, timestamp, before/after quantity, and mandatory reason.
-4. **Zero-Regression Mandate**: When building subsequent modules (Module 5+), existing endpoints, components, and tests must remain functional.
+4. **Zero-Regression Mandate**: When building subsequent modules (Module 6+), existing endpoints, components, and tests must remain functional.
 
 ---
 
@@ -30,7 +30,7 @@ This project is a web-based **Stock Management System** developed as part of a *
 - **Authentication**: JWT (`jsonwebtoken`) with 24-hour expiration
 - **Password Hashing**: `bcryptjs` (salt rounds: 10)
 - **CORS**: Configured for `http://localhost:5173` with credentials support
-- **Port**: `5000` (`http://localhost:5000/api`)
+- **Port**: `5001` (`http://localhost:5001/api`) *(Default configured to 5001 to avoid EADDRINUSE conflict with Docker Desktop / WSL relay on port 5000)*
 
 ### Frontend
 - **Framework**: React 18.x with TypeScript
@@ -80,17 +80,24 @@ the_real_stock_it/
 │   │   │   │   ├── services/           # InventoryService.ts
 │   │   │   │   ├── types/              # inventory.types.ts
 │   │   │   │   └── validators/         # inventoryValidators.ts
-│   │   │   └── suppliers/              # MODULE 4: Supplier Registry & Catalog
-│   │   │       ├── controllers/        # SupplierController.ts
-│   │   │       ├── models/             # Supplier.ts, SupplierProduct.ts
-│   │   │       ├── routes/             # supplierRoutes.ts
-│   │   │       ├── services/           # SupplierService.ts
-│   │   │       ├── types/              # supplier.types.ts
-│   │   │       └── validators/         # supplierValidators.ts
+│   │   │   ├── suppliers/              # MODULE 4: Supplier Registry & Catalog
+│   │   │   │   ├── controllers/        # SupplierController.ts
+│   │   │   │   ├── models/             # Supplier.ts, SupplierProduct.ts
+│   │   │   │   ├── routes/             # supplierRoutes.ts
+│   │   │   │   ├── services/           # SupplierService.ts
+│   │   │   │   ├── types/              # supplier.types.ts
+│   │   │   │   └── validators/         # supplierValidators.ts
+│   │   │   └── customers/              # MODULE 5: Customer Management
+│   │   │       ├── controllers/        # CustomerController.ts
+│   │   │       ├── models/             # Customer.ts
+│   │   │       ├── routes/             # customerRoutes.ts
+│   │   │       ├── services/           # CustomerService.ts
+│   │   │       ├── types/              # customer.types.ts
+│   │   │       └── validators/         # customerValidators.ts
 │   │   ├── app.ts                      # Express app factory & route mounting
 │   │   └── server.ts                   # Server entrypoint
 │   └── tests/
-│       └── run_tests.js                # 48-test comprehensive verification suite
+│       └── run_tests.js                # 59-test comprehensive verification suite
 ├── frontend/
 │   ├── src/
 │   │   ├── components/                 # Shared UI (AppLayout, Navbar, Sidebar, etc.)
@@ -98,7 +105,8 @@ the_real_stock_it/
 │   │   │   ├── authentication/         # Auth pages, context, ProtectedRoute
 │   │   │   ├── products/               # Products list, modals, Category management
 │   │   │   ├── inventory/              # Stock ledger, Stock IN/OUT modals, adjustments
-│   │   │   └── suppliers/              # Supplier directory, detail view, product linker
+│   │   │   ├── suppliers/              # Supplier directory, detail view, product linker
+│   │   │   └── customers/              # Customer directory, add/edit modal, details modal
 │   │   ├── App.tsx                     # React Router definition
 │   │   └── main.tsx                    # React DOM entrypoint
 └── PROJECT_HANDOVER_SPEC.md            # This specification file
@@ -112,9 +120,9 @@ the_real_stock_it/
 - **Features**: Registration, Login, Logout, Current User Profile query/update, Password Hashing (`bcrypt`), JWT Token generation/validation.
 - **Roles Seeded**:
   - `ADMIN` (Full wildcard permissions `*`)
-  - `INVENTORY_MANAGER` (Products, Inventory, Supplier read)
+  - `INVENTORY_MANAGER` (Products, Inventory, Supplier read, Customer read)
   - `SALES_MANAGER` (Sales, Customers, Invoices, Read Inventory/Products)
-  - `PURCHASE_MANAGER` (Purchases, Suppliers, Read Inventory/Products)
+  - `PURCHASE_MANAGER` (Purchases, Suppliers, Read Customers, Read Inventory/Products)
   - `VIEWER` (Read-only access across all domains)
 - **Enforcement**: Centralized `RoleService.can(role, action)` and `requirePermission(action)` middleware.
 
@@ -140,6 +148,13 @@ the_real_stock_it/
 - **Status & Soft Deletion**: Active / Inactive states with soft-deactivation preserving historical relationships.
 - **Product Catalog Association**: `supplier_products` join table allowing multiple products to be linked/unlinked to any supplier.
 - **Future Integration Hooks**: Supplier detail modal contains a dedicated "Purchase History" tab with a clean placeholder ready for Module 6.
+
+### Module 5: Customer Management (COMPLETED)
+- **Features**: Customer directory (Customer Name, Company Name, Email, Phone, Alternate Phone, Address, City, State, Country, Postal Code, Tax/GST number, Notes, Status).
+- **Status & Soft Deactivation**: `ACTIVE` and `INACTIVE` states with confirmation dialogs; soft deactivation prevents breaking historical sales orders and invoices.
+- **Search & Filters**: Search by ID, customer name, company, email, phone. Multi-parameter filters by status (`ALL`, `ACTIVE`, `INACTIVE`), city, and state.
+- **Future Integration Hooks**: Customer details view includes dedicated tabs and placeholders for **Orders** (Module 7), **Sales History** (Module 7), and **Invoices & Billing** (Module 8).
+- **Authorization**: `ADMIN` and `SALES_MANAGER` have full management access (create, edit, toggle status); all roles have read access.
 
 ---
 
@@ -255,6 +270,53 @@ CREATE TABLE IF NOT EXISTS supplier_products (
     FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON UPDATE CASCADE ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES products(id) ON UPDATE CASCADE ON DELETE RESTRICT
 );
+
+-- 9. Customers
+CREATE TABLE IF NOT EXISTS customers (
+    id TEXT PRIMARY KEY,
+    customer_name TEXT NOT NULL,
+    company_name TEXT,
+    email TEXT UNIQUE NOT NULL COLLATE NOCASE,
+    phone TEXT NOT NULL,
+    alternate_phone TEXT,
+    address TEXT NOT NULL,
+    city TEXT NOT NULL,
+    state TEXT NOT NULL,
+    country TEXT NOT NULL,
+    postal_code TEXT NOT NULL,
+    tax_number TEXT,
+    notes TEXT,
+    status TEXT NOT NULL DEFAULT 'ACTIVE', -- 'ACTIVE', 'INACTIVE'
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_role_id ON users(role_id);
+CREATE INDEX IF NOT EXISTS idx_categories_name ON categories(name);
+CREATE INDEX IF NOT EXISTS idx_products_sku ON products(sku);
+CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);
+CREATE INDEX IF NOT EXISTS idx_products_category_id ON products(category_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_product_id ON inventory(product_id);
+CREATE INDEX IF NOT EXISTS idx_stock_trans_product_id ON stock_transactions(product_id);
+CREATE INDEX IF NOT EXISTS idx_stock_trans_type ON stock_transactions(transaction_type);
+CREATE INDEX IF NOT EXISTS idx_stock_trans_created_at ON stock_transactions(created_at);
+CREATE INDEX IF NOT EXISTS idx_stock_trans_performed_by ON stock_transactions(performed_by);
+CREATE INDEX IF NOT EXISTS idx_suppliers_supplier_name ON suppliers(supplier_name);
+CREATE INDEX IF NOT EXISTS idx_suppliers_company_name ON suppliers(company_name);
+CREATE INDEX IF NOT EXISTS idx_suppliers_email ON suppliers(email);
+CREATE INDEX IF NOT EXISTS idx_suppliers_status ON suppliers(status);
+CREATE INDEX IF NOT EXISTS idx_suppliers_city ON suppliers(city);
+CREATE INDEX IF NOT EXISTS idx_supplier_products_supplier_id ON supplier_products(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_supplier_products_product_id ON supplier_products(product_id);
+CREATE INDEX IF NOT EXISTS idx_customers_customer_name ON customers(customer_name);
+CREATE INDEX IF NOT EXISTS idx_customers_company_name ON customers(company_name);
+CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email);
+CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
+CREATE INDEX IF NOT EXISTS idx_customers_status ON customers(status);
+CREATE INDEX IF NOT EXISTS idx_customers_city ON customers(city);
+CREATE INDEX IF NOT EXISTS idx_customers_state ON customers(state);
 ```
 
 ---
@@ -302,43 +364,49 @@ All routes return JSON with a standard envelope:
 - `POST /api/suppliers/:id/products` — Link product to supplier
 - `DELETE /api/suppliers/:id/products/:productId` — Unlink product from supplier
 
+### Customers (`/api/customers`)
+- `GET /api/customers` — List customers with pagination, search, status, city & state filters
+- `GET /api/customers/metrics` — Customer metrics (Total customers, active count, inactive count)
+- `GET /api/customers/:id` — Customer details (with orders, sales_history & invoices placeholders)
+- `POST /api/customers` — Register new customer with field & email uniqueness validation
+- `PUT /api/customers/:id` — Update customer information
+- `PATCH /api/customers/:id/status` — Toggle customer status (`ACTIVE` / `INACTIVE`)
+- `DELETE /api/customers/:id` — Soft-deactivate customer (`status = 'INACTIVE'`)
+
 ---
 
 ## 7. Verification & Testing
 
-The repository includes a comprehensive 48-test integration suite:
+The repository includes a comprehensive 59-test integration suite:
 ```powershell
 # Run from backend directory:
 npm test
 ```
-**Current Test Coverage Breakdown (48/48 Passing):**
+**Current Test Coverage Breakdown (59/59 Passing):**
 - **Tests 1–14**: Authentication, invalid passwords, email collision, profile isolation, bcrypt verification, role assignment.
 - **Tests 15–24**: Category uniqueness, product creation, duplicate SKU rejection, price validation, search/filters, soft delete.
 - **Tests 25–35**: Inventory initialization, Stock IN/OUT, negative stock prevention, adjustments, status state machines, ledger logging.
 - **Tests 36–48**: Supplier registry CRUD, email collision, soft deactivation, catalog association/disassociation, RBAC protections.
+- **Tests 49–59**: Customer registry CRUD, validation checks, duplicate email conflict, search & multi-parameter filtering, soft-deactivation state machine, RBAC authorization (SALES_MANAGER create/edit, VIEWER read-only).
 
 ---
 
 ## 8. Remaining Modules Roadmap (For Subsequent Sprints)
 
 The planned remaining modules for the SCM project are:
-1. **Module 5: Customer Management** *(Next to implement)*
-   - Customer registry (Name, company, email, phone, billing/shipping address, tax ID).
-   - Active/Inactive status and soft-deactivation.
-   - Customer order history placeholder for Module 7.
-2. **Module 6: Purchase Management**
+1. **Module 6: Purchase Management** *(Next to implement)*
    - Purchase orders (PO generation, status: `DRAFT`, `ORDERED`, `RECEIVED`, `CANCELLED`).
    - Linking suppliers (Module 4) and products (Module 2).
    - Inbound fulfillment triggering automatic `STOCK_IN` transactions (Module 3).
-3. **Module 7: Sales Management**
+2. **Module 7: Sales Management**
    - Sales orders (SO generation, status: `PENDING`, `DISPATCHED`, `COMPLETED`, `CANCELLED`).
    - Linking customers (Module 5) and products (Module 2).
    - Outbound fulfillment triggering automatic `STOCK_OUT` transactions (Module 3).
-4. **Module 8: Invoices & Payments / Billing**
+3. **Module 8: Invoices & Payments / Billing**
    - Invoicing for purchases (AP) and sales (AR).
-5. **Module 9: Dashboard & Reporting / Analytics**
+4. **Module 9: Dashboard & Reporting / Analytics**
    - Executive dashboard aggregating Inventory, Sales, Purchases, and Financial health.
-6. **Module 10: Notifications & Activity Audit Trail**
+5. **Module 10: Notifications & Activity Audit Trail**
    - Low stock notifications, system events, and global audit log.
 
 ---
@@ -350,18 +418,19 @@ Copy and paste the prompt in the box below to start the next module in Antigravi
 ```markdown
 Hello Antigravity! I am continuing development of our web-based Stock Management System (SCM project).
 
-The previous developer completed Modules 1 through 4 (Authentication, Product Management, Inventory Management, and Supplier Management).
-All 48 existing automated tests are passing in `backend/tests/run_tests.js`.
+The previous developer completed Modules 1 through 5 (Authentication, Product Management, Inventory Management, Supplier Management, and Customer Management).
+All 59 existing automated tests are passing in `backend/tests/run_tests.js`.
 Full technical and architectural specifications are documented in `PROJECT_HANDOVER_SPEC.md` at the project root.
 
 Please inspect the existing architecture, database schema (`backend/src/database/schema.sql`), and API patterns.
 
 We are now ready to implement ONLY the next module:
-👉 MODULE 5: CUSTOMER MANAGEMENT
+👉 MODULE 6: PURCHASE MANAGEMENT
 
 Requirements:
 - Follow all existing patterns (TypeScript, Express, node:sqlite, React, Tailwind).
 - Maintain high cohesion, low coupling, soft-deactivation, and role-based permissions.
-- Do not break or regress any existing modules (preserve 48/48 tests and add new tests for Module 5).
-- Please confirm you have inspected the project and are ready to implement Module 5.
+- Inbound receiving should automatically trigger Stock IN transactions in Module 3.
+- Do not break or regress any existing modules (preserve 59/59 tests and add new tests for Module 6).
+- Please confirm you have inspected the project and are ready to implement Module 6.
 ```

@@ -1085,6 +1085,263 @@ async function runAllTests() {
       `Expected status 403 Forbidden, got ${viewerCreateSupRes.status}`
     );
 
+  
+    // ----------------------------------------------------
+    // MODULE 5: CUSTOMER MANAGEMENT TESTS (TESTS 49 - 59)
+    // ----------------------------------------------------
+    console.log('\n--- MODULE 5: CUSTOMER MANAGEMENT ---');
+
+    // Register a SALES_MANAGER user
+    const salesUserEmail = `sales_${Date.now()}@stockit.local`;
+    const salesRegRes = await makeRequest(port, 'POST', '/api/auth/register', {
+      full_name: 'Sales Director',
+      email: salesUserEmail,
+      password: 'SalesPass@2026',
+      confirm_password: 'SalesPass@2026',
+      role: 'SALES_MANAGER',
+    });
+    const salesManagerToken = salesRegRes.body?.data?.token;
+
+    // TEST 49: List customers and metrics query (Initial seed check)
+    const custListRes = await makeRequest(port, 'GET', '/api/customers', undefined, salesManagerToken);
+    const custMetricsRes = await makeRequest(port, 'GET', '/api/customers/metrics', undefined, salesManagerToken);
+    assert(
+      custListRes.status === 200 &&
+        custListRes.body.success === true &&
+        Array.isArray(custListRes.body.data.items) &&
+        custListRes.body.data.items.length >= 3 &&
+        custMetricsRes.status === 200 &&
+        custMetricsRes.body.data.total_customers >= 3,
+      'TEST 49: List customers & metrics query (Seeds loaded)',
+      `Expected status 200 with >=3 seeded customers, got ${custListRes.status}, count=${custListRes.body?.data?.items?.length}`
+    );
+
+    // TEST 50: Create a valid customer with contact and address details
+    const newCustEmail = `test.client_${Date.now()}@apexcorp.local`;
+    const createCustRes = await makeRequest(
+      port,
+      'POST',
+      '/api/customers',
+      {
+        customer_name: 'Arjun Mehta',
+        company_name: 'Mehta Enterprise Logistics',
+        email: newCustEmail,
+        phone: '+91 98200 11223',
+        alternate_phone: '+91 98200 11224',
+        address: '502 Business Bay, Lower Parel',
+        city: 'Mumbai',
+        state: 'Maharashtra',
+        country: 'India',
+        postal_code: '400013',
+        tax_number: '27AABCM1122M1Z3',
+        notes: 'Priority corporate customer. Net 30 payment terms.',
+        status: 'ACTIVE',
+      },
+      salesManagerToken
+    );
+    const createdCustomerId = createCustRes.body?.data?.id;
+    assert(
+      createCustRes.status === 201 &&
+        createCustRes.body.success === true &&
+        createdCustomerId &&
+        createdCustomerId.startsWith('cust_') &&
+        createCustRes.body.data.customer_name === 'Arjun Mehta' &&
+        createCustRes.body.data.status === 'ACTIVE',
+      'TEST 50: Add valid customer with contact and location details',
+      `Expected status 201 with customer object, got ${createCustRes.status}`
+    );
+
+    // TEST 51: Reject customer creation with missing required fields
+    const missingCustRes = await makeRequest(
+      port,
+      'POST',
+      '/api/customers',
+      {
+        customer_name: '',
+        company_name: '',
+        email: '',
+      },
+      salesManagerToken
+    );
+    assert(
+      missingCustRes.status === 400 &&
+        missingCustRes.body.success === false &&
+        missingCustRes.body.errors,
+      'TEST 51: Validation check: reject missing required fields',
+      `Expected status 400 with validation errors, got ${missingCustRes.status}`
+    );
+
+    // TEST 52: Reject invalid email format during customer registration
+    const invalidEmailCustRes = await makeRequest(
+      port,
+      'POST',
+      '/api/customers',
+      {
+        customer_name: 'Faulty Email User',
+        email: 'invalid-email-address-format',
+        phone: '+91 98765 43210',
+        address: '100 Main St',
+        city: 'Pune',
+        state: 'Maharashtra',
+        country: 'India',
+        postal_code: '411001',
+      },
+      salesManagerToken
+    );
+    assert(
+      invalidEmailCustRes.status === 400 &&
+        invalidEmailCustRes.body.errors &&
+        invalidEmailCustRes.body.errors.email,
+      'TEST 52: Validation check: reject invalid email format',
+      `Expected status 400 with email validation error, got ${invalidEmailCustRes.status}`
+    );
+
+    // TEST 53: Duplicate customer email rejection (409 Conflict)
+    const dupCustRes = await makeRequest(
+      port,
+      'POST',
+      '/api/customers',
+      {
+        customer_name: 'Duplicate Client',
+        email: newCustEmail,
+        phone: '+91 98888 77777',
+        address: 'Another Address',
+        city: 'Mumbai',
+        state: 'Maharashtra',
+        country: 'India',
+        postal_code: '400001',
+      },
+      salesManagerToken
+    );
+    assert(
+      dupCustRes.status === 409 && dupCustRes.body.success === false,
+      'TEST 53: Duplicate handling: reject duplicate customer email (409 Conflict)',
+      `Expected status 409 Conflict, got ${dupCustRes.status}`
+    );
+
+    // TEST 54: Edit / update customer details
+    const updateCustRes = await makeRequest(
+      port,
+      'PUT',
+      `/api/customers/${createdCustomerId}`,
+      {
+        customer_name: 'Arjun Mehta (VP Operations)',
+        notes: 'Updated credit limit: ₹500,000 upon contract renewal.',
+      },
+      salesManagerToken
+    );
+    assert(
+      updateCustRes.status === 200 &&
+        updateCustRes.body.success === true &&
+        updateCustRes.body.data.customer_name === 'Arjun Mehta (VP Operations)' &&
+        updateCustRes.body.data.notes === 'Updated credit limit: ₹500,000 upon contract renewal.',
+      'TEST 54: Edit / update customer details',
+      `Expected status 200 with updated fields, got ${updateCustRes.status}`
+    );
+
+    // TEST 55: View customer details by ID (with future module placeholders)
+    const getCustDetailsRes = await makeRequest(
+      port,
+      'GET',
+      `/api/customers/${createdCustomerId}`,
+      undefined,
+      salesManagerToken
+    );
+    assert(
+      getCustDetailsRes.status === 200 &&
+        getCustDetailsRes.body.success === true &&
+        getCustDetailsRes.body.data.id === createdCustomerId &&
+        Array.isArray(getCustDetailsRes.body.data.sales_history) &&
+        Array.isArray(getCustDetailsRes.body.data.orders) &&
+        Array.isArray(getCustDetailsRes.body.data.invoices),
+      'TEST 55: View customer details by ID (with future sales/orders/invoices placeholders)',
+      `Expected status 200 with customer detail placeholders, got ${getCustDetailsRes.status}`
+    );
+
+    // TEST 56: Search customers by query string
+    const searchCustRes = await makeRequest(
+      port,
+      'GET',
+      '/api/customers?search=Mehta',
+      undefined,
+      salesManagerToken
+    );
+    assert(
+      searchCustRes.status === 200 &&
+        searchCustRes.body.data.items.length >= 1 &&
+        searchCustRes.body.data.items.some((c) => c.id === createdCustomerId),
+      'TEST 56: Search customers by query string',
+      `Expected search to find created customer, got count=${searchCustRes.body?.data?.items?.length}`
+    );
+
+    // TEST 57: Filter customers by status=ACTIVE and city
+    const filterActiveCustRes = await makeRequest(
+      port,
+      'GET',
+      '/api/customers?status=ACTIVE&city=Mumbai',
+      undefined,
+      salesManagerToken
+    );
+    assert(
+      filterActiveCustRes.status === 200 &&
+        filterActiveCustRes.body.data.items.every((c) => c.status === 'ACTIVE' && c.city.toLowerCase().includes('mumbai')),
+      'TEST 57: Filter customers by status=ACTIVE and city',
+      `Expected all filtered items to match ACTIVE status and city Mumbai, got status=${filterActiveCustRes.status}`
+    );
+
+    // TEST 58: Soft-deactivate customer (ACTIVE -> INACTIVE)
+    const deactCustRes = await makeRequest(
+      port,
+      'PATCH',
+      `/api/customers/${createdCustomerId}/status`,
+      { status: 'INACTIVE' },
+      salesManagerToken
+    );
+    const getDeactCustRes = await makeRequest(
+      port,
+      'GET',
+      `/api/customers/${createdCustomerId}`,
+      undefined,
+      salesManagerToken
+    );
+    assert(
+      deactCustRes.status === 200 &&
+        getDeactCustRes.status === 200 &&
+        getDeactCustRes.body.data.status === 'INACTIVE',
+      'TEST 58: Soft-deactivate customer (Active -> Inactive)',
+      `Expected status INACTIVE, got ${getDeactCustRes.body?.data?.status}`
+    );
+
+    // TEST 59: Role-based authorization on Customers (VIEWER cannot create, but CAN read)
+    const viewerCreateCustRes = await makeRequest(
+      port,
+      'POST',
+      '/api/customers',
+      {
+        customer_name: 'Unauthorized Customer Attempt',
+        email: 'unauth@client.local',
+        phone: '+91 99999 00000',
+        address: 'No Address',
+        city: 'Delhi',
+        state: 'Delhi',
+        country: 'India',
+        postal_code: '110001',
+      },
+      viewerToken
+    );
+    const viewerReadCustRes = await makeRequest(
+      port,
+      'GET',
+      '/api/customers',
+      undefined,
+      viewerToken
+    );
+    assert(
+      viewerCreateCustRes.status === 403 && viewerReadCustRes.status === 200,
+      'TEST 59: Role-based authorization (VIEWER is forbidden from creating/editing, but can read)',
+      `Expected create=403, read=200, got create=${viewerCreateCustRes.status}, read=${viewerReadCustRes.status}`
+    );
+
   } finally {
     server.close();
   }

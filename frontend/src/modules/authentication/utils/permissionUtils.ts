@@ -1,4 +1,4 @@
-﻿import { IUser, UserRole } from '../types/auth.types';
+import { IUser, UserRole } from '../types/auth.types';
 
 /**
  * Role permissions mapping on frontend for declarative UI capability checks.
@@ -13,11 +13,14 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'inventory:read',
     'inventory:adjust',
     'inventory:manage',
+    'supplier:read',
+    'customer:read',
     'report:inventory',
   ],
   SALES_MANAGER: [
     'product:read',
     'inventory:read',
+    'supplier:read',
     'customer:read',
     'customer:manage',
     'sales:read',
@@ -32,6 +35,7 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'inventory:read',
     'supplier:read',
     'supplier:manage',
+    'customer:read',
     'purchase:read',
     'purchase:create',
     'purchase:approve',
@@ -40,6 +44,8 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   VIEWER: [
     'product:read',
     'inventory:read',
+    'supplier:read',
+    'customer:read',
     'sales:read',
     'purchase:read',
     'report:read',
