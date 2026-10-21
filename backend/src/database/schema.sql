@@ -160,3 +160,47 @@ CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
 CREATE INDEX IF NOT EXISTS idx_customers_status ON customers(status);
 CREATE INDEX IF NOT EXISTS idx_customers_city ON customers(city);
 CREATE INDEX IF NOT EXISTS idx_customers_state ON customers(state);
+
+
+-- 10. Purchase Orders
+CREATE TABLE IF NOT EXISTS purchase_orders (
+    id TEXT PRIMARY KEY,
+    supplier_id TEXT NOT NULL,
+    order_date TEXT NOT NULL,
+    expected_delivery_date TEXT,
+    status TEXT NOT NULL DEFAULT 'DRAFT', -- 'DRAFT', 'ORDERED', 'PARTIALLY_RECEIVED', 'RECEIVED', 'CANCELLED'
+    subtotal REAL NOT NULL DEFAULT 0.0,
+    tax REAL NOT NULL DEFAULT 0.0,
+    discount REAL NOT NULL DEFAULT 0.0,
+    total REAL NOT NULL DEFAULT 0.0,
+    notes TEXT,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON UPDATE CASCADE ON DELETE RESTRICT,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON UPDATE CASCADE ON DELETE RESTRICT
+);
+
+-- 11. Purchase Order Items
+CREATE TABLE IF NOT EXISTS purchase_order_items (
+    id TEXT PRIMARY KEY,
+    purchase_order_id TEXT NOT NULL,
+    product_id TEXT NOT NULL,
+    quantity INTEGER NOT NULL,
+    received_quantity INTEGER NOT NULL DEFAULT 0,
+    unit_price REAL NOT NULL DEFAULT 0.0,
+    tax REAL NOT NULL DEFAULT 0.0,
+    discount REAL NOT NULL DEFAULT 0.0,
+    line_total REAL NOT NULL DEFAULT 0.0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON UPDATE CASCADE ON DELETE RESTRICT
+);
+
+-- Indexes for Purchase Orders & Items
+CREATE INDEX IF NOT EXISTS idx_po_supplier_id ON purchase_orders(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_po_status ON purchase_orders(status);
+CREATE INDEX IF NOT EXISTS idx_po_order_date ON purchase_orders(order_date);
+CREATE INDEX IF NOT EXISTS idx_po_created_by ON purchase_orders(created_by);
+CREATE INDEX IF NOT EXISTS idx_poi_purchase_order_id ON purchase_order_items(purchase_order_id);
+CREATE INDEX IF NOT EXISTS idx_poi_product_id ON purchase_order_items(product_id);

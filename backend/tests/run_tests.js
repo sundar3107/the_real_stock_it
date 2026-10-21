@@ -1342,6 +1342,331 @@ async function runAllTests() {
       `Expected create=403, read=200, got create=${viewerCreateCustRes.status}, read=${viewerReadCustRes.status}`
     );
 
+    // ----------------------------------------------------
+    // MODULE 6: PURCHASE MANAGEMENT TESTS (TESTS 60 - 71)
+    // ----------------------------------------------------
+    console.log('\n--- MODULE 6: PURCHASE MANAGEMENT ---');
+
+    // TEST 60: List purchase orders and metrics query (Initial seed check)
+    const poListRes = await makeRequest(port, 'GET', '/api/purchases', undefined, purchaseManagerToken);
+    const poMetricsRes = await makeRequest(port, 'GET', '/api/purchases/metrics', undefined, purchaseManagerToken);
+    assert(
+      poListRes.status === 200 &&
+        poListRes.body.success === true &&
+        Array.isArray(poListRes.body.data.items) &&
+        poListRes.body.data.total >= 1 &&
+        poMetricsRes.status === 200 &&
+        poMetricsRes.body.data.total_orders >= 1,
+      'TEST 60: List purchase orders & metrics query (Seeds loaded)',
+      `Expected status 200 with at least 1 PO, got count=${poListRes.body?.data?.total}, metrics=${JSON.stringify(poMetricsRes.body?.data)}`
+    );
+
+    // Find active supplier and active product for PO tests
+    const activeSuppliers = supListRes.body.data.items.filter((s) => s.status === 'ACTIVE');
+    const testSupplierId = activeSuppliers[0]?.id || 'sup_prime_tech';
+    const productsRes = await makeRequest(port, 'GET', '/api/products', undefined, purchaseManagerToken);
+    const activeProducts = productsRes.body.data.items.filter((p) => p.status === 'ACTIVE');
+    const testPoProductId = activeProducts[0]?.id || testInvProductId;
+
+    // TEST 61: Create a valid purchase order (Status: DRAFT)
+    const createPoRes = await makeRequest(
+      port,
+      'POST',
+      '/api/purchases',
+      {
+        supplier_id: testSupplierId,
+        order_date: '2026-11-01',
+        expected_delivery_date: '2026-11-15',
+        status: 'DRAFT',
+        notes: 'Urgent restocking order for upcoming peak season.',
+        items: [
+          {
+            product_id: testPoProductId,
+            quantity: 30,
+            unit_price: 120.0,
+            tax: 50.0,
+            discount: 20.0,
+          },
+        ],
+      },
+      purchaseManagerToken
+    );
+    const createdPoId = createPoRes.body?.data?.id;
+    const createdPoItemId = createPoRes.body?.data?.items?.[0]?.id;
+    assert(
+      createPoRes.status === 201 &&
+        createPoRes.body.success === true &&
+        createdPoId &&
+        createPoRes.body.data.status === 'DRAFT' &&
+        createPoRes.body.data.subtotal === 3630.0 &&
+        createPoRes.body.data.total === 3630.0,
+      'TEST 61: Create a valid purchase order with active supplier and line items',
+      `Expected status 201 with DRAFT status and total=3630, got status=${createPoRes.status}, data=${JSON.stringify(createPoRes.body?.data)}`
+    );
+
+    // TEST 62: Reject purchase order creation with missing required fields or non-existent supplier
+    const invalidSupPoRes = await makeRequest(
+      port,
+      'POST',
+      '/api/purchases',
+      {
+        supplier_id: 'sup_non_existent_99999',
+        order_date: '2026-11-01',
+        items: [{ product_id: testPoProductId, quantity: 10, unit_price: 50 }],
+      },
+      purchaseManagerToken
+    );
+    const missingFieldsPoRes = await makeRequest(
+      port,
+      'POST',
+      '/api/purchases',
+      {
+        supplier_id: '',
+        order_date: '',
+        items: [],
+      },
+      purchaseManagerToken
+    );
+    assert(
+      (invalidSupPoRes.status === 400 || invalidSupPoRes.status === 404) && missingFieldsPoRes.status === 400,
+      'TEST 62: Reject purchase order creation with missing fields or non-existent supplier',
+      `Expected status 400/404, got invalidSup=${invalidSupPoRes.status}, missingFields=${missingFieldsPoRes.status}`
+    );
+
+    // TEST 63: Reject purchase order with quantity <= 0 or empty line items
+    const zeroQtyPoRes = await makeRequest(
+      port,
+      'POST',
+      '/api/purchases',
+      {
+        supplier_id: testSupplierId,
+        order_date: '2026-11-01',
+        items: [
+          {
+            product_id: testPoProductId,
+            quantity: 0,
+            unit_price: 100,
+          },
+        ],
+      },
+      purchaseManagerToken
+    );
+    assert(
+      zeroQtyPoRes.status === 400 && zeroQtyPoRes.body.errors,
+      'TEST 63: Reject purchase order with quantity <= 0 or empty line items',
+      `Expected status 400 with quantity validation error, got ${zeroQtyPoRes.status}`
+    );
+
+    // TEST 64: Update purchase order details while in DRAFT status
+    const updateDraftPoRes = await makeRequest(
+      port,
+      'PUT',
+      `/api/purchases/${createdPoId}`,
+      {
+        notes: 'Updated restocking instructions: fragile packaging required.',
+        expected_delivery_date: '2026-11-20',
+      },
+      purchaseManagerToken
+    );
+    assert(
+      updateDraftPoRes.status === 200 &&
+        updateDraftPoRes.body.success === true &&
+        updateDraftPoRes.body.data.notes === 'Updated restocking instructions: fragile packaging required.' &&
+        updateDraftPoRes.body.data.expected_delivery_date === '2026-11-20',
+      'TEST 64: Update purchase order details while in DRAFT status',
+      `Expected status 200 with updated fields, got ${updateDraftPoRes.status}`
+    );
+
+    // TEST 65: Status transition: DRAFT -> ORDERED
+    const submitPoRes = await makeRequest(
+      port,
+      'PATCH',
+      `/api/purchases/${createdPoId}/status`,
+      { status: 'ORDERED' },
+      purchaseManagerToken
+    );
+    assert(
+      submitPoRes.status === 200 && submitPoRes.body.data.status === 'ORDERED',
+      'TEST 65: Status transition: DRAFT -> ORDERED',
+      `Expected status 200 with ORDERED status, got ${submitPoRes.body?.data?.status}`
+    );
+
+    // Get current inventory balance before receiving
+    const invBeforeRes = await makeRequest(
+      port,
+      'GET',
+      `/api/inventory/item/${testPoProductId}`,
+      undefined,
+      inventoryManagerToken
+    );
+    const currentQtyBefore = invBeforeRes.body?.data?.current_quantity ?? 0;
+
+    // TEST 66: Receive products (Partial receipt) & verify authoritative inventory stock IN
+    const partialReceiveRes = await makeRequest(
+      port,
+      'POST',
+      `/api/purchases/${createdPoId}/receive`,
+      {
+        items: [
+          {
+            item_id: createdPoItemId,
+            receive_quantity: 12,
+          },
+        ],
+        notes: 'Inbound shipment part 1 - arrived in good condition',
+      },
+      inventoryManagerToken
+    );
+    // Verify inventory balance increased by exactly 12 units
+    const invAfterPartialRes = await makeRequest(
+      port,
+      'GET',
+      `/api/inventory/item/${testPoProductId}`,
+      undefined,
+      inventoryManagerToken
+    );
+    const currentQtyAfterPartial = invAfterPartialRes.body?.data?.current_quantity ?? 0;
+
+    assert(
+      partialReceiveRes.status === 200 &&
+        partialReceiveRes.body.success === true &&
+        partialReceiveRes.body.data.purchase_order.status === 'PARTIALLY_RECEIVED' &&
+        partialReceiveRes.body.data.purchase_order.items[0].received_quantity === 12 &&
+        currentQtyAfterPartial === currentQtyBefore + 12,
+      'TEST 66: Receive products (Partial receipt) & verify authoritative inventory stock IN',
+      `Expected status 200, PO status=PARTIALLY_RECEIVED, received_qty=12, inventory before=${currentQtyBefore}, after=${currentQtyAfterPartial}`
+    );
+
+    // TEST 67: Receive remaining products (Full receipt)
+    const fullReceiveRes = await makeRequest(
+      port,
+      'POST',
+      `/api/purchases/${createdPoId}/receive`,
+      {
+        items: [
+          {
+            item_id: createdPoItemId,
+            receive_quantity: 18, // Remaining 18 out of 30
+          },
+        ],
+        notes: 'Inbound shipment part 2 - final delivery',
+      },
+      inventoryManagerToken
+    );
+    const invAfterFullRes = await makeRequest(
+      port,
+      'GET',
+      `/api/inventory/item/${testPoProductId}`,
+      undefined,
+      inventoryManagerToken
+    );
+    const currentQtyAfterFull = invAfterFullRes.body?.data?.current_quantity ?? 0;
+
+    assert(
+      fullReceiveRes.status === 200 &&
+        fullReceiveRes.body.success === true &&
+        fullReceiveRes.body.data.purchase_order.status === 'RECEIVED' &&
+        fullReceiveRes.body.data.purchase_order.items[0].received_quantity === 30 &&
+        currentQtyAfterFull === currentQtyAfterPartial + 18,
+      'TEST 67: Receive remaining products (Full receipt)',
+      `Expected status 200, PO status=RECEIVED, received_qty=30, inventory after=${currentQtyAfterFull}`
+    );
+
+    // TEST 68: Reject receiving excess quantity beyond ordered remaining
+    const excessReceiveRes = await makeRequest(
+      port,
+      'POST',
+      `/api/purchases/${createdPoId}/receive`,
+      {
+        items: [
+          {
+            item_id: createdPoItemId,
+            receive_quantity: 5,
+          },
+        ],
+      },
+      inventoryManagerToken
+    );
+    assert(
+      excessReceiveRes.status === 400 && excessReceiveRes.body.success === false,
+      'TEST 68: Reject receiving excess quantity beyond ordered remaining',
+      `Expected status 400 on excess receive, got ${excessReceiveRes.status}`
+    );
+
+    // TEST 69: Reject status transition to CANCELLED once products have already been received
+    const cancelReceivedPoRes = await makeRequest(
+      port,
+      'PATCH',
+      `/api/purchases/${createdPoId}/status`,
+      { status: 'CANCELLED' },
+      purchaseManagerToken
+    );
+    assert(
+      cancelReceivedPoRes.status === 400 && cancelReceivedPoRes.body.success === false,
+      'TEST 69: Reject status transition to CANCELLED once items have been received',
+      `Expected status 400 rejecting cancellation of received order, got ${cancelReceivedPoRes.status}`
+    );
+
+    // TEST 70: Search & filter purchase orders by status, supplier, search query
+    const filterReceivedPoRes = await makeRequest(
+      port,
+      'GET',
+      '/api/purchases?status=RECEIVED',
+      undefined,
+      purchaseManagerToken
+    );
+    const searchPoRes = await makeRequest(
+      port,
+      'GET',
+      `/api/purchases?search=${createdPoId}`,
+      undefined,
+      purchaseManagerToken
+    );
+    assert(
+      filterReceivedPoRes.status === 200 &&
+        filterReceivedPoRes.body.data.items.every((po) => po.status === 'RECEIVED') &&
+        searchPoRes.status === 200 &&
+        searchPoRes.body.data.items.some((po) => po.id === createdPoId),
+      'TEST 70: Search & filter purchase orders by status, supplier, search query',
+      `Expected search to find created PO and filter to match status=RECEIVED, got status=${filterReceivedPoRes.status}`
+    );
+
+    // TEST 71: Role-based authorization on Purchase operations
+    const viewerCreatePoRes = await makeRequest(
+      port,
+      'POST',
+      '/api/purchases',
+      {
+        supplier_id: testSupplierId,
+        order_date: '2026-11-01',
+        items: [{ product_id: testPoProductId, quantity: 10, unit_price: 50 }],
+      },
+      viewerToken
+    );
+    const viewerReceivePoRes = await makeRequest(
+      port,
+      'POST',
+      `/api/purchases/${createdPoId}/receive`,
+      {
+        items: [{ item_id: createdPoItemId, receive_quantity: 1 }],
+      },
+      viewerToken
+    );
+    const viewerReadPoRes = await makeRequest(
+      port,
+      'GET',
+      '/api/purchases',
+      undefined,
+      viewerToken
+    );
+    assert(
+      viewerCreatePoRes.status === 403 &&
+        viewerReceivePoRes.status === 403 &&
+        viewerReadPoRes.status === 200,
+      'TEST 71: Role-based authorization (VIEWER is forbidden from creating/receiving, but can read)',
+      `Expected create=403, receive=403, read=200, got create=${viewerCreatePoRes.status}, receive=${viewerReceivePoRes.status}, read=${viewerReadPoRes.status}`
+    );
+
   } finally {
     server.close();
   }

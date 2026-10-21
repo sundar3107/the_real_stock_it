@@ -265,6 +265,57 @@ export function runMigrations() {
     }
     console.log('[DB] Standard customers seeded.');
   }
+
+  // 7. Seed standard purchase orders if none exist and products/suppliers exist
+  const countPOStmt = db.prepare('SELECT COUNT(*) as count FROM purchase_orders');
+  const poResult = countPOStmt.get() as any;
+  const poCount = poResult ? poResult.count : 0;
+
+  if (poCount === 0) {
+    const adminUser = db.prepare("SELECT id FROM users LIMIT 1").get() as any;
+    const adminId = adminUser ? adminUser.id : 'usr_default_admin';
+    const supplierRow = db.prepare("SELECT id FROM suppliers LIMIT 1").get() as any;
+    const products = db.prepare("SELECT id, purchase_price FROM products LIMIT 2").all() as any[];
+
+    if (supplierRow && products.length > 0) {
+      console.log('[DB] No purchase orders found. Seeding initial purchase order...');
+      const poId = 'po_seed_001';
+      const p1 = products[0];
+      const p2 = products[1] || products[0];
+      const qty1 = 20;
+      const qty2 = 10;
+      const price1 = Number(p1.purchase_price) || 50;
+      const price2 = Number(p2.purchase_price) || 30;
+      const total1 = qty1 * price1;
+      const total2 = qty2 * price2;
+      const subtotal = total1 + total2;
+      const tax = Math.round(subtotal * 0.05 * 100) / 100;
+      const total = subtotal + tax;
+
+      db.prepare(`
+        INSERT INTO purchase_orders (
+          id, supplier_id, order_date, expected_delivery_date, status,
+          subtotal, tax, discount, total, notes, created_by, created_at, updated_at
+        ) VALUES (
+          ?, ?, date('now'), date('now', '+7 days'), 'ORDERED',
+          ?, ?, 0, ?, 'Initial restock purchase order for standard inventory items.', ?, datetime('now'), datetime('now')
+        )
+      `).run(poId, supplierRow.id, subtotal, tax, total, adminId);
+
+      const insertItemStmt = db.prepare(`
+        INSERT INTO purchase_order_items (
+          id, purchase_order_id, product_id, quantity, received_quantity,
+          unit_price, tax, discount, line_total, created_at
+        ) VALUES (?, ?, ?, ?, 0, ?, 0, 0, ?, datetime('now'))
+      `);
+
+      insertItemStmt.run('poi_seed_001', poId, p1.id, qty1, price1, total1);
+      if (products.length > 1) {
+        insertItemStmt.run('poi_seed_002', poId, p2.id, qty2, price2, total2);
+      }
+      console.log('[DB] Standard purchase order seeded.');
+    }
+  }
 }
 
 // Allow direct execution

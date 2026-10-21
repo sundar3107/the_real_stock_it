@@ -1,7 +1,16 @@
 import React from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { Header } from './Header';
-import { LayoutDashboard, Package, Boxes, Truck, Users, UserCheck, Layers } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Package,
+  Boxes,
+  Truck,
+  Users,
+  ShoppingBag,
+  UserCheck,
+  Layers,
+} from 'lucide-react';
 
 export const AppLayout: React.FC = () => {
   const location = useLocation();
@@ -12,6 +21,7 @@ export const AppLayout: React.FC = () => {
     { label: 'Inventory', path: '/inventory', icon: Boxes },
     { label: 'Suppliers', path: '/suppliers', icon: Truck },
     { label: 'Customers', path: '/customers', icon: Users },
+    { label: 'Purchases', path: '/purchases', icon: ShoppingBag },
     { label: 'My Profile', path: '/profile', icon: UserCheck },
   ];
 
@@ -53,7 +63,7 @@ export const AppLayout: React.FC = () => {
                 <span>Upcoming SCM Modules</span>
               </div>
               <div className="px-3 py-1 text-xs text-slate-400 italic">
-                Purchases & Sales will link here in future modules.
+                Sales & Invoicing will link here in future modules.
               </div>
             </div>
           </nav>
@@ -66,7 +76,7 @@ export const AppLayout: React.FC = () => {
       </div>
 
       <footer className="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
-        Stock Management System &bull; SCM Project Baseline &bull; Module 5: Customer Management
+        Stock Management System &bull; SCM Project Baseline &bull; Module 6: Purchase Management
       </footer>
     </div>
   );
