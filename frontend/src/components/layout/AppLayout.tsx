@@ -8,6 +8,7 @@ import {
   Truck,
   Users,
   ShoppingBag,
+  TrendingUp,
   UserCheck,
   Layers,
 } from 'lucide-react';
@@ -22,6 +23,7 @@ export const AppLayout: React.FC = () => {
     { label: 'Suppliers', path: '/suppliers', icon: Truck },
     { label: 'Customers', path: '/customers', icon: Users },
     { label: 'Purchases', path: '/purchases', icon: ShoppingBag },
+    { label: 'Sales', path: '/sales', icon: TrendingUp },
     { label: 'My Profile', path: '/profile', icon: UserCheck },
   ];
 

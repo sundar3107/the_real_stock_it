@@ -204,3 +204,47 @@ CREATE INDEX IF NOT EXISTS idx_po_order_date ON purchase_orders(order_date);
 CREATE INDEX IF NOT EXISTS idx_po_created_by ON purchase_orders(created_by);
 CREATE INDEX IF NOT EXISTS idx_poi_purchase_order_id ON purchase_order_items(purchase_order_id);
 CREATE INDEX IF NOT EXISTS idx_poi_product_id ON purchase_order_items(product_id);
+
+-- 12. Sales Orders (Module 7)
+CREATE TABLE IF NOT EXISTS sales_orders (
+    id TEXT PRIMARY KEY,
+    order_number TEXT UNIQUE NOT NULL,
+    customer_id TEXT NOT NULL,
+    order_date TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'DRAFT' CHECK(status IN ('DRAFT', 'CONFIRMED', 'PROCESSING', 'COMPLETED', 'CANCELLED')),
+    subtotal REAL NOT NULL DEFAULT 0.0 CHECK(subtotal >= 0),
+    tax REAL NOT NULL DEFAULT 0.0 CHECK(tax >= 0),
+    discount REAL NOT NULL DEFAULT 0.0 CHECK(discount >= 0),
+    total REAL NOT NULL DEFAULT 0.0 CHECK(total >= 0),
+    notes TEXT,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON UPDATE CASCADE ON DELETE RESTRICT,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON UPDATE CASCADE ON DELETE RESTRICT
+);
+
+-- 13. Sales Order Items (Module 7)
+CREATE TABLE IF NOT EXISTS sales_order_items (
+    id TEXT PRIMARY KEY,
+    sales_order_id TEXT NOT NULL,
+    product_id TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK(quantity > 0),
+    unit_price REAL NOT NULL DEFAULT 0.0 CHECK(unit_price >= 0),
+    tax REAL NOT NULL DEFAULT 0.0 CHECK(tax >= 0),
+    discount REAL NOT NULL DEFAULT 0.0 CHECK(discount >= 0),
+    line_total REAL NOT NULL DEFAULT 0.0 CHECK(line_total >= 0),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (sales_order_id) REFERENCES sales_orders(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON UPDATE CASCADE ON DELETE RESTRICT
+);
+
+-- Indexes for Sales Orders & Items
+CREATE INDEX IF NOT EXISTS idx_so_order_number ON sales_orders(order_number);
+CREATE INDEX IF NOT EXISTS idx_so_customer_id ON sales_orders(customer_id);
+CREATE INDEX IF NOT EXISTS idx_so_status ON sales_orders(status);
+CREATE INDEX IF NOT EXISTS idx_so_order_date ON sales_orders(order_date);
+CREATE INDEX IF NOT EXISTS idx_so_created_by ON sales_orders(created_by);
+CREATE INDEX IF NOT EXISTS idx_soi_sales_order_id ON sales_order_items(sales_order_id);
+CREATE INDEX IF NOT EXISTS idx_soi_product_id ON sales_order_items(product_id);
+

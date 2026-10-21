@@ -1667,6 +1667,371 @@ async function runAllTests() {
       `Expected create=403, receive=403, read=200, got create=${viewerCreatePoRes.status}, receive=${viewerReceivePoRes.status}, read=${viewerReadPoRes.status}`
     );
 
+    // ----------------------------------------------------
+    // MODULE 7: SALES MANAGEMENT TESTS (TESTS 72 - 83)
+    // ----------------------------------------------------
+    console.log('\n--- MODULE 7: SALES MANAGEMENT ---');
+
+    // TEST 72: List sales orders & metrics query (Seeds loaded)
+    const soListRes = await makeRequest(port, 'GET', '/api/sales', undefined, salesManagerToken);
+    const soMetricsRes = await makeRequest(port, 'GET', '/api/sales/metrics', undefined, salesManagerToken);
+    assert(
+      soListRes.status === 200 &&
+        soListRes.body.success === true &&
+        Array.isArray(soListRes.body.data.items) &&
+        soListRes.body.data.total >= 1 &&
+        soMetricsRes.status === 200 &&
+        soMetricsRes.body.data.total_orders >= 1,
+      'TEST 72: List sales orders & metrics query (Seeds loaded)',
+      `Expected status 200 with at least 1 sales order, got count=${soListRes.body?.data?.total}`
+    );
+
+    // Create an active customer specifically for sales testing
+    const activeCustRes = await makeRequest(
+      port,
+      'POST',
+      '/api/customers',
+      {
+        customer_name: 'Apex Retail Enterprises',
+        company_name: 'Apex Retail Ltd',
+        email: `apex_sales_${Date.now()}@apexretail.local`,
+        phone: '+91 98111 22233',
+        address: '500 MG Road',
+        city: 'Bengaluru',
+        state: 'Karnataka',
+        country: 'India',
+        postal_code: '560001',
+      },
+      salesManagerToken
+    );
+    const testSalesCustomerId = activeCustRes.body?.data?.id;
+
+    // TEST 73: Create a sales order as DRAFT with line items and financial calculation
+    const createSoRes = await makeRequest(
+      port,
+      'POST',
+      '/api/sales',
+      {
+        customer_id: testSalesCustomerId,
+        order_date: '2026-11-05',
+        status: 'DRAFT',
+        notes: 'Customer retail order with standard courier delivery.',
+        items: [
+          {
+            product_id: testPoProductId,
+            quantity: 4,
+            unit_price: 200.0,
+            tax: 20.0,
+            discount: 10.0,
+          },
+        ],
+      },
+      salesManagerToken
+    );
+    const createdSoId = createSoRes.body?.data?.id;
+    const createdSoNumber = createSoRes.body?.data?.order_number;
+    assert(
+      createSoRes.status === 201 &&
+        createSoRes.body.success === true &&
+        createdSoId &&
+        createSoRes.body.data.status === 'DRAFT' &&
+        createdSoNumber &&
+        createdSoNumber.startsWith('SO-') &&
+        createSoRes.body.data.subtotal === 810.0 &&
+        createSoRes.body.data.total === 810.0,
+      'TEST 73: Create a sales order as DRAFT with line items and financial calculation',
+      `Expected status 201 with DRAFT status and total=810, got status=${createSoRes.status}, data=${JSON.stringify(createSoRes.body?.data)}`
+    );
+
+    // TEST 74: Validation check: reject sales order with missing fields or inactive customer
+    const missingCustSoRes = await makeRequest(
+      port,
+      'POST',
+      '/api/sales',
+      {
+        customer_id: '',
+        items: [{ product_id: testPoProductId, quantity: 2, unit_price: 150 }],
+      },
+      salesManagerToken
+    );
+    // createdCustomerId was deactivated to INACTIVE in TEST 58
+    const inactiveCustSoRes = await makeRequest(
+      port,
+      'POST',
+      '/api/sales',
+      {
+        customer_id: createdCustomerId,
+        items: [{ product_id: testPoProductId, quantity: 2, unit_price: 150 }],
+      },
+      salesManagerToken
+    );
+    assert(
+      missingCustSoRes.status === 400 &&
+        inactiveCustSoRes.status === 400 &&
+        inactiveCustSoRes.body.message.includes('inactive customer'),
+      'TEST 74: Validation check: reject sales order with missing fields or inactive customer',
+      `Expected status 400 for both, got missing=${missingCustSoRes.status}, inactive=${inactiveCustSoRes.status}`
+    );
+
+    // TEST 75: Validation check: reject sales order with quantity <= 0 or empty line items
+    const emptyItemsSoRes = await makeRequest(
+      port,
+      'POST',
+      '/api/sales',
+      {
+        customer_id: testSalesCustomerId,
+        items: [],
+      },
+      salesManagerToken
+    );
+    const zeroQtySoRes = await makeRequest(
+      port,
+      'POST',
+      '/api/sales',
+      {
+        customer_id: testSalesCustomerId,
+        items: [{ product_id: testPoProductId, quantity: 0, unit_price: 100 }],
+      },
+      salesManagerToken
+    );
+    assert(
+      emptyItemsSoRes.status === 400 && zeroQtySoRes.status === 400,
+      'TEST 75: Validation check: reject sales order with quantity <= 0 or empty line items',
+      `Expected status 400, got emptyItems=${emptyItemsSoRes.status}, zeroQty=${zeroQtySoRes.status}`
+    );
+
+    // TEST 76: Update sales order details while in DRAFT status
+    const updateDraftSoRes = await makeRequest(
+      port,
+      'PUT',
+      `/api/sales/${createdSoId}`,
+      {
+        notes: 'Priority express dispatch requested by customer.',
+        items: [
+          {
+            product_id: testPoProductId,
+            quantity: 5,
+            unit_price: 200.0,
+            tax: 25.0,
+            discount: 15.0,
+          },
+        ],
+      },
+      salesManagerToken
+    );
+    assert(
+      updateDraftSoRes.status === 200 &&
+        updateDraftSoRes.body.success === true &&
+        updateDraftSoRes.body.data.notes === 'Priority express dispatch requested by customer.' &&
+        updateDraftSoRes.body.data.items[0].quantity === 5 &&
+        updateDraftSoRes.body.data.total === 1010.0, // 5*200 + 25 - 15 = 1010
+      'TEST 76: Update sales order details while in DRAFT status',
+      `Expected status 200 with updated fields and total=1010, got ${updateDraftSoRes.status}`
+    );
+
+    // TEST 77: Status transition: DRAFT -> CONFIRMED
+    const confirmSoRes = await makeRequest(
+      port,
+      'PATCH',
+      `/api/sales/${createdSoId}/status`,
+      { status: 'CONFIRMED' },
+      salesManagerToken
+    );
+    assert(
+      confirmSoRes.status === 200 && confirmSoRes.body.data.status === 'CONFIRMED',
+      'TEST 77: Status transition: DRAFT -> CONFIRMED',
+      `Expected status 200 with CONFIRMED status, got ${confirmSoRes.body?.data?.status}`
+    );
+
+    // TEST 78: Stock Validation: Reject sale completion when requested quantity exceeds available stock
+    const excessSoRes = await makeRequest(
+      port,
+      'POST',
+      '/api/sales',
+      {
+        customer_id: testSalesCustomerId,
+        status: 'CONFIRMED',
+        items: [{ product_id: testPoProductId, quantity: 999999, unit_price: 50 }],
+      },
+      salesManagerToken
+    );
+    const excessSoId = excessSoRes.body?.data?.id;
+    const excessCompleteRes = await makeRequest(
+      port,
+      'POST',
+      `/api/sales/${excessSoId}/complete`,
+      {},
+      salesManagerToken
+    );
+    assert(
+      excessCompleteRes.status === 400 &&
+        excessCompleteRes.body.success === false &&
+        excessCompleteRes.body.message.includes('Insufficient stock'),
+      'TEST 78: Stock Validation: Reject sale completion when requested quantity exceeds available stock',
+      `Expected status 400 with Insufficient stock message, got ${excessCompleteRes.status}`
+    );
+
+    // TEST 79: Complete sale (Stock OUT fulfillment): verify physical inventory balance deduction
+    const invBeforeSaleRes = await makeRequest(
+      port,
+      'GET',
+      `/api/inventory/item/${testPoProductId}`,
+      undefined,
+      inventoryManagerToken
+    );
+    const invQtyBeforeSale = invBeforeSaleRes.body?.data?.current_quantity ?? 0;
+
+    const completeSaleRes = await makeRequest(
+      port,
+      'POST',
+      `/api/sales/${createdSoId}/complete`,
+      {},
+      salesManagerToken
+    );
+
+    const invAfterSaleRes = await makeRequest(
+      port,
+      'GET',
+      `/api/inventory/item/${testPoProductId}`,
+      undefined,
+      inventoryManagerToken
+    );
+    const invQtyAfterSale = invAfterSaleRes.body?.data?.current_quantity ?? 0;
+
+    assert(
+      completeSaleRes.status === 200 &&
+        completeSaleRes.body.success === true &&
+        completeSaleRes.body.data.status === 'COMPLETED' &&
+        invQtyAfterSale === invQtyBeforeSale - 5,
+      'TEST 79: Complete sale (Stock OUT fulfillment): verify physical inventory balance deduction',
+      `Expected status 200, status=COMPLETED, inventory before=${invQtyBeforeSale}, after=${invQtyAfterSale} (expected decrement of 5)`
+    );
+
+    // TEST 80: Verify immutable stock transaction audit ledger created with Sales Order reference
+    const salesTxRes = await makeRequest(
+      port,
+      'GET',
+      `/api/inventory/transactions?product_id=${testPoProductId}&limit=10`,
+      undefined,
+      inventoryManagerToken
+    );
+    const hasSoStockOutTx =
+      salesTxRes.status === 200 &&
+      salesTxRes.body.data.items.some(
+        (t) =>
+          t.transaction_type === 'STOCK_OUT' &&
+          t.quantity === 5 &&
+          t.reference &&
+          t.reference.includes(`SO #${createdSoNumber}`)
+      );
+    assert(
+      hasSoStockOutTx,
+      'TEST 80: Verify immutable stock transaction audit ledger created with Sales Order reference',
+      `Expected STOCK_OUT transaction referencing SO #${createdSoNumber}, got transactions=${JSON.stringify(salesTxRes.body?.data?.items?.slice(0, 3))}`
+    );
+
+    // TEST 81: Idempotency check: Cannot complete sale twice (prevents double stock deduction)
+    const doubleCompleteRes = await makeRequest(
+      port,
+      'POST',
+      `/api/sales/${createdSoId}/complete`,
+      {},
+      salesManagerToken
+    );
+    const invAfterDoubleRes = await makeRequest(
+      port,
+      'GET',
+      `/api/inventory/item/${testPoProductId}`,
+      undefined,
+      inventoryManagerToken
+    );
+    const invQtyAfterDouble = invAfterDoubleRes.body?.data?.current_quantity ?? 0;
+
+    assert(
+      doubleCompleteRes.status === 400 &&
+        doubleCompleteRes.body.success === false &&
+        doubleCompleteRes.body.message.includes('already completed') &&
+        invQtyAfterDouble === invQtyAfterSale,
+      'TEST 81: Idempotency check: Cannot complete sale twice (prevents double stock deduction)',
+      `Expected status 400 rejecting duplicate completion and unchanged inventory, got status=${doubleCompleteRes.status}`
+    );
+
+    // TEST 82: Cancelled order cannot be completed
+    const draftForCancelRes = await makeRequest(
+      port,
+      'POST',
+      '/api/sales',
+      {
+        customer_id: testSalesCustomerId,
+        status: 'DRAFT',
+        items: [{ product_id: testPoProductId, quantity: 1, unit_price: 100 }],
+      },
+      salesManagerToken
+    );
+    const cancelTargetId = draftForCancelRes.body?.data?.id;
+    await makeRequest(
+      port,
+      'PATCH',
+      `/api/sales/${cancelTargetId}/status`,
+      { status: 'CANCELLED' },
+      salesManagerToken
+    );
+    const completeCancelledRes = await makeRequest(
+      port,
+      'POST',
+      `/api/sales/${cancelTargetId}/complete`,
+      {},
+      salesManagerToken
+    );
+    assert(
+      completeCancelledRes.status === 400 &&
+        completeCancelledRes.body.success === false &&
+        completeCancelledRes.body.message.includes('cancelled'),
+      'TEST 82: Cancelled order cannot be completed',
+      `Expected status 400 rejecting completion of cancelled order, got ${completeCancelledRes.status}`
+    );
+
+    // TEST 83: Role-based authorization on Sales operations
+    const viewerCreateSoRes = await makeRequest(
+      port,
+      'POST',
+      '/api/sales',
+      {
+        customer_id: testSalesCustomerId,
+        items: [{ product_id: testPoProductId, quantity: 1, unit_price: 100 }],
+      },
+      viewerToken
+    );
+    const viewerCompleteSoRes = await makeRequest(
+      port,
+      'POST',
+      `/api/sales/${createdSoId}/complete`,
+      {},
+      viewerToken
+    );
+    const viewerReadSoRes = await makeRequest(
+      port,
+      'GET',
+      '/api/sales',
+      undefined,
+      viewerToken
+    );
+    const viewerReadSingleSoRes = await makeRequest(
+      port,
+      'GET',
+      `/api/sales/${createdSoId}`,
+      undefined,
+      viewerToken
+    );
+    assert(
+      viewerCreateSoRes.status === 403 &&
+        viewerCompleteSoRes.status === 403 &&
+        viewerReadSoRes.status === 200 &&
+        viewerReadSingleSoRes.status === 200,
+      'TEST 83: Role-based authorization on Sales operations (VIEWER forbidden from creating/completing, but can read)',
+      `Expected create=403, complete=403, read=200, got create=${viewerCreateSoRes.status}, complete=${viewerCompleteSoRes.status}, read=${viewerReadSoRes.status}`
+    );
+
   } finally {
     server.close();
   }

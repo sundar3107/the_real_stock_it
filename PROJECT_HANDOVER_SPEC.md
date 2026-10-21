@@ -2,8 +2,8 @@
 
 > **Target Audience:** Incoming Software Engineer / AI Agent in Google Antigravity.  
 > **Repository Root:** `C:\Users\abish\.gemini\antigravity\scratch\the_real_stock_it\`  
-> **Status:** Modules 1 through 6 are **100% completed, tested, and verified** (71/71 automated tests passing).  
-> **Next Module in Queue:** **Module 7: Sales Management**.
+> **Status:** Modules 1 through 7 are **100% completed, tested, and verified** (83/83 automated tests passing).  
+> **Next Module in Queue:** **Module 8: Invoices & Payments / Billing**.
 
 ---
 
@@ -14,12 +14,13 @@ This project is a web-based **Stock Management System** developed as part of a *
 ### Key SCM & Architectural Principles
 1. **Incremental, Strict Modular Development**: Each module is implemented sequentially in isolation without modifying or regressing previous modules.
 2. **High Cohesion, Low Coupling**: Modules communicate through clean, explicit service boundaries and join tables. Domain logic is strictly encapsulated within its own module folder.
-   - *Purchase Management owns purchase transactions.*
-   - *Inventory Management (`InventoryService.stockIn`) is the sole authority for physical stock quantities and immutable stock ledger entries.*
+   - *Purchase Management owns purchase procurement transactions.*
+   - *Sales Management owns customer sales orders.*
+   - *Inventory Management (`InventoryService.stockIn` / `InventoryService.stockOut`) is the sole authority for physical stock quantities and immutable stock ledger entries.*
 3. **Traceability & Auditability**:
-   - No hard deletes for master entities (products, suppliers, customers, users, purchase orders). Soft-deactivations transition status to `INACTIVE` or `CANCELLED`.
+   - No hard deletes for master entities (products, suppliers, customers, users, purchase orders, sales orders). Soft-deactivations transition status to `INACTIVE` or `CANCELLED`.
    - All physical inventory balance modifications record immutable rows in `stock_transactions` with actor ID, timestamp, before/after quantity, and mandatory reason.
-4. **Zero-Regression Mandate**: When building subsequent modules (Module 7+), existing endpoints, components, and tests must remain functional.
+4. **Zero-Regression Mandate**: When building subsequent modules (Module 8+), existing endpoints, components, and tests must remain functional.
 
 ---
 
@@ -96,17 +97,24 @@ the_real_stock_it/
 │   │   │   │   ├── services/           # CustomerService.ts
 │   │   │   │   ├── types/              # customer.types.ts
 │   │   │   │   └── validators/         # customerValidators.ts
-│   │   │   └── purchases/              # MODULE 6: Purchase Management
-│   │   │       ├── controllers/        # PurchaseController.ts
-│   │   │       ├── models/             # PurchaseOrder.ts, PurchaseOrderItem.ts
-│   │   │       ├── routes/             # purchaseRoutes.ts
-│   │   │       ├── services/           # PurchaseService.ts
-│   │   │       ├── types/              # purchase.types.ts
-│   │   │       └── validators/         # purchaseValidators.ts
+│   │   │   ├── purchases/              # MODULE 6: Purchase Management
+│   │   │   │   ├── controllers/        # PurchaseController.ts
+│   │   │   │   ├── models/             # PurchaseOrder.ts, PurchaseOrderItem.ts
+│   │   │   │   ├── routes/             # purchaseRoutes.ts
+│   │   │   │   ├── services/           # PurchaseService.ts
+│   │   │   │   ├── types/              # purchase.types.ts
+│   │   │   │   └── validators/         # purchaseValidators.ts
+│   │   │   └── sales/                  # MODULE 7: Sales Management
+│   │   │       ├── controllers/        # SalesController.ts
+│   │   │       ├── models/             # SalesOrder.ts, SalesOrderItem.ts
+│   │   │       ├── routes/             # salesRoutes.ts
+│   │   │       ├── services/           # SalesService.ts
+│   │   │       ├── types/              # sales.types.ts
+│   │   │       └── validators/         # salesValidators.ts
 │   │   ├── app.ts                      # Express app factory & route mounting
 │   │   └── server.ts                   # Server entrypoint
 │   └── tests/
-│       └── run_tests.js                # 71-test comprehensive verification suite
+│       └── run_tests.js                # 83-test comprehensive verification suite
 ├── frontend/
 │   ├── src/
 │   │   ├── components/                 # Shared UI (AppLayout, Navbar, Sidebar, etc.)
@@ -116,7 +124,8 @@ the_real_stock_it/
 │   │   │   ├── inventory/              # Stock ledger, Stock IN/OUT modals, adjustments
 │   │   │   ├── suppliers/              # Supplier directory, detail view, product linker
 │   │   │   ├── customers/              # Customer directory, add/edit modal, details modal
-│   │   │   └── purchases/              # Purchases list, PO create/edit form, receive modal, details modal
+│   │   │   ├── purchases/              # Purchases list, PO create/edit form, receive modal, details modal
+│   │   │   └── sales/                  # Sales list, SO create/edit form, details modal, table
 │   │   ├── App.tsx                     # React Router definition
 │   │   └── main.tsx                    # React DOM entrypoint
 └── PROJECT_HANDOVER_SPEC.md            # This specification file
@@ -130,9 +139,9 @@ the_real_stock_it/
 - **Features**: Registration, Login, Logout, Current User Profile query/update, Password Hashing (`bcrypt`), JWT Token generation/validation.
 - **Roles Seeded**:
   - `ADMIN` (Full wildcard permissions `*`)
-  - `INVENTORY_MANAGER` (Products, Inventory, Supplier read, Customer read, Purchase read, Purchase receive)
+  - `INVENTORY_MANAGER` (Products, Inventory, Supplier read, Customer read, Purchase read, Purchase receive, Sales read)
   - `SALES_MANAGER` (Sales, Customers, Invoices, Read Inventory/Products/Suppliers/Purchases)
-  - `PURCHASE_MANAGER` (Purchases, Suppliers, Read Customers, Read Inventory/Products)
+  - `PURCHASE_MANAGER` (Purchases, Suppliers, Read Customers, Read Inventory/Products, Read Sales)
   - `VIEWER` (Read-only access across all domains)
 - **Enforcement**: Centralized `RoleService.can(role, action)` and `requirePermission(action)` middleware.
 
@@ -179,6 +188,25 @@ the_real_stock_it/
   - `ADMIN` & `PURCHASE_MANAGER`: Full access to create, edit, approve, cancel, and receive purchase orders.
   - `INVENTORY_MANAGER`: Can view purchase orders and receive inbound products into inventory.
   - `VIEWER` & `SALES_MANAGER`: Read-only access.
+
+### Module 7: Sales Management (COMPLETED)
+- **Features**: Sales order lifecycle management (`DRAFT`, `CONFIRMED`, `PROCESSING`, `COMPLETED`, `CANCELLED`).
+- **Order Creation & Financials**:
+  - Unique order number generation (`SO-YYYY-XXXX`).
+  - Active customer selection (inactive customers rejected).
+  - Active product catalog with automatic selling price population.
+  - Real-time subtotal, tax, discount, and grand total calculations.
+- **Stock Validation**:
+  - Validates available inventory (`Requested Quantity <= Current Stock`) before confirmation/completion.
+  - Rejects operations with insufficient stock and prevents negative inventory.
+- **Outbound Stock Fulfillment (Critical Inventory Integration)**:
+  - Completing a sales order delegates directly to `InventoryService.stockOut` for physical stock depletion and records immutable stock transactions in `stock_transactions` referencing `SO #<order_number>`.
+  - Idempotent execution: completing an order reduces stock exactly once and forbids duplicate stock deduction.
+  - Cancelled orders cannot be completed.
+- **Authorization**:
+  - `ADMIN` & `SALES_MANAGER`: Full management access (create, edit, confirm, complete, cancel).
+  - `INVENTORY_MANAGER`: View sales orders and monitor outbound demand.
+  - `PURCHASE_MANAGER` & `VIEWER`: Read-only access.
 
 ---
 
@@ -350,6 +378,40 @@ CREATE TABLE IF NOT EXISTS purchase_order_items (
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT
 );
 
+-- 12. Sales Orders (Module 7)
+CREATE TABLE IF NOT EXISTS sales_orders (
+    id TEXT PRIMARY KEY,
+    order_number TEXT UNIQUE NOT NULL,
+    customer_id TEXT NOT NULL,
+    order_date TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'DRAFT' CHECK(status IN ('DRAFT', 'CONFIRMED', 'PROCESSING', 'COMPLETED', 'CANCELLED')),
+    subtotal REAL NOT NULL DEFAULT 0.0 CHECK(subtotal >= 0),
+    tax REAL NOT NULL DEFAULT 0.0 CHECK(tax >= 0),
+    discount REAL NOT NULL DEFAULT 0.0 CHECK(discount >= 0),
+    total REAL NOT NULL DEFAULT 0.0 CHECK(total >= 0),
+    notes TEXT,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON UPDATE CASCADE ON DELETE RESTRICT,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON UPDATE CASCADE ON DELETE RESTRICT
+);
+
+-- 13. Sales Order Items (Module 7)
+CREATE TABLE IF NOT EXISTS sales_order_items (
+    id TEXT PRIMARY KEY,
+    sales_order_id TEXT NOT NULL,
+    product_id TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK(quantity > 0),
+    unit_price REAL NOT NULL DEFAULT 0.0 CHECK(unit_price >= 0),
+    tax REAL NOT NULL DEFAULT 0.0 CHECK(tax >= 0),
+    discount REAL NOT NULL DEFAULT 0.0 CHECK(discount >= 0),
+    line_total REAL NOT NULL DEFAULT 0.0 CHECK(line_total >= 0),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (sales_order_id) REFERENCES sales_orders(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON UPDATE CASCADE ON DELETE RESTRICT
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_role_id ON users(role_id);
@@ -382,6 +444,13 @@ CREATE INDEX IF NOT EXISTS idx_purchase_orders_order_date ON purchase_orders(ord
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_created_by ON purchase_orders(created_by);
 CREATE INDEX IF NOT EXISTS idx_purchase_order_items_po_id ON purchase_order_items(purchase_order_id);
 CREATE INDEX IF NOT EXISTS idx_purchase_order_items_product_id ON purchase_order_items(product_id);
+CREATE INDEX IF NOT EXISTS idx_so_order_number ON sales_orders(order_number);
+CREATE INDEX IF NOT EXISTS idx_so_customer_id ON sales_orders(customer_id);
+CREATE INDEX IF NOT EXISTS idx_so_status ON sales_orders(status);
+CREATE INDEX IF NOT EXISTS idx_so_order_date ON sales_orders(order_date);
+CREATE INDEX IF NOT EXISTS idx_so_created_by ON sales_orders(created_by);
+CREATE INDEX IF NOT EXISTS idx_soi_sales_order_id ON sales_order_items(sales_order_id);
+CREATE INDEX IF NOT EXISTS idx_soi_product_id ON sales_order_items(product_id);
 ```
 
 ---
@@ -447,16 +516,25 @@ All routes return JSON with a standard envelope:
 - `PATCH /api/purchases/:id/status` — Transition PO status (`DRAFT` -> `ORDERED` -> `CANCELLED`)
 - `POST /api/purchases/:id/receive` — Receive items into physical inventory (delegates to `InventoryService.stockIn`, increments stock, creates immutable stock ledger entry, updates PO item received quantities and PO status to `PARTIALLY_RECEIVED` or `RECEIVED`)
 
+### Sales (`/api/sales`)
+- `GET /api/sales` — List sales orders with search, status, customer, date range, and pagination
+- `GET /api/sales/metrics` — Aggregate metrics (Total orders, drafts, confirmed, processing, completed, cancelled, total revenue)
+- `GET /api/sales/:id` — Get full sales order details including line items and customer contact
+- `POST /api/sales` — Create sales order with line items (computes subtotal, tax, discount, grand total)
+- `PUT /api/sales/:id` — Update sales order details and items while in `DRAFT` status
+- `PATCH /api/sales/:id/status` — Transition sales order status (`DRAFT` -> `CONFIRMED` -> `PROCESSING` -> `COMPLETED`, or `CANCELLED`)
+- `POST /api/sales/:id/complete` — Complete sale and fulfill stock (validates available stock for each line item, invokes `InventoryService.stockOut`, decrements inventory, creates immutable stock ledger entries referencing `SO #<order_number>`, and marks status as `COMPLETED` exactly once)
+
 ---
 
 ## 7. Verification & Testing
 
-The repository includes a comprehensive 71-test integration suite:
+The repository includes a comprehensive 83-test integration suite:
 ```powershell
 # Run from backend directory:
 npm test
 ```
-**Current Test Coverage Breakdown (71/71 Passing):**
+**Current Test Coverage Breakdown (83/83 Passing):**
 - **Tests 1–14**: Authentication, invalid passwords, email collision, profile isolation, bcrypt verification, role assignment.
 - **Tests 15–24**: Category uniqueness, product creation, duplicate SKU rejection, price validation, search/filters, soft delete.
 - **Tests 25–35**: Inventory initialization, Stock IN/OUT, negative stock prevention, adjustments, status state machines, ledger logging.
@@ -474,48 +552,58 @@ npm test
   - Prevention of order cancellation once items have been received.
   - Multi-parameter search and status filtering.
   - RBAC protection: VIEWER forbidden from creating POs and receiving goods, while permitted read-only access.
+- **Tests 72–83**: Sales Management:
+  - Sales order seeds and metrics query.
+  - Valid sales order creation as DRAFT with line items and financial calculations.
+  - Validation: rejection of missing fields, non-existent or inactive customers.
+  - Validation: rejection of quantity <= 0 and empty line items.
+  - Sales order modification while in DRAFT status.
+  - Status transition state machine (`DRAFT` -> `CONFIRMED`).
+  - Stock validation: rejection of sale completion when requested quantity exceeds available stock (negative stock prevention).
+  - Complete sale (Stock OUT fulfillment): authoritative stock depletion via `InventoryService.stockOut` and inventory balance deduction verification.
+  - Immutable stock transaction audit ledger verification with Sales Order reference (`SO #...`).
+  - Idempotency verification: sale cannot reduce stock twice.
+  - Rejection of completing cancelled orders.
+  - Role-based authorization: VIEWER forbidden from creating or completing sales orders, while permitted read-only access.
 
 ---
 
 ## 8. Remaining Modules Roadmap (For Subsequent Sprints)
 
 The planned remaining modules for the SCM project are:
-1. **Module 7: Sales Management** *(Next to implement)*
-   - Sales orders (SO generation: Customer selection, product items, quantity, selling price, discounts, taxes).
-   - Order statuses: `DRAFT`, `CONFIRMED`, `PARTIALLY_DISPATCHED`, `DISPATCHED`, `CANCELLED`.
-   - Outbound stock fulfillment: dispatching sales items invokes `InventoryService.stockOut` to reduce physical inventory balances and write audit ledger transactions with SO references.
-   - Prevention of overselling / negative stock validation.
-2. **Module 8: Invoices & Payments / Billing**
+1. **Module 8: Invoices & Payments / Billing** *(Next to implement)*
    - Invoicing for purchases (Accounts Payable) and sales (Accounts Receivable).
-   - Payment status tracking (`UNPAID`, `PARTIAL`, `PAID`).
-3. **Module 9: Dashboard & Reporting / Analytics**
+   - Linking invoices to Purchase Orders (Module 6) and Sales Orders (Module 7).
+   - Payment status tracking (`UNPAID`, `PARTIALLY_PAID`, `PAID`, `OVERDUE`).
+   - Payment method recording (Cash, Bank Transfer, Cheque, UPI).
+2. **Module 9: Dashboard & Reporting / Analytics**
    - Executive dashboard aggregating Inventory, Sales, Purchases, and Financial health.
    - Stock valuation, fast/slow moving items, turnover rate, and supplier performance.
-4. **Module 10: Notifications & Activity Audit Trail**
+3. **Module 10: Notifications & Activity Audit Trail**
    - Low stock notifications, out of stock alerts, order status notifications, global audit log.
 
 ---
 
 ## 9. Prompt to Hand Over to the Next Antigravity Session
 
-Copy and paste the prompt in the box below to start Module 7 in Antigravity:
+Copy and paste the prompt in the box below to start Module 8 in Antigravity:
 
 ```markdown
 Hello Antigravity! I am continuing development of our web-based Stock Management System (SCM project).
 
-The previous developer completed Modules 1 through 6 (Authentication, Products, Inventory, Suppliers, Customers, and Purchase Management).
-All 71 existing automated tests are passing in `backend/tests/run_tests.js`.
+The previous developer completed Modules 1 through 7 (Authentication, Products, Inventory, Suppliers, Customers, Purchases, and Sales Management).
+All 83 existing automated tests are passing in `backend/tests/run_tests.js`.
 Full technical and architectural specifications are documented in `PROJECT_HANDOVER_SPEC.md` at the project root.
 
 Please inspect the existing architecture, database schema (`backend/src/database/schema.sql`), and API patterns.
 
 We are now ready to implement ONLY the next module:
-👉 MODULE 7: SALES MANAGEMENT
+👉 MODULE 8: INVOICES & PAYMENTS / BILLING
 
 Requirements:
 - Follow all existing patterns (TypeScript, Express, node:sqlite, React, Tailwind).
 - Maintain high cohesion, low coupling, soft-deactivation, and role-based permissions.
-- Sales Management owns sales orders; physical stock depletion must delegate to `InventoryService.stockOut`.
-- Do not break or regress any existing modules (preserve 71/71 tests and add new tests for Module 7).
-- Please confirm you have inspected the project and are ready to implement Module 7.
+- Invoices link to completed Purchase Orders (AP) and Sales Orders (AR).
+- Do not break or regress any existing modules (preserve 83/83 tests and add new tests for Module 8).
+- Please confirm you have inspected the project and are ready to implement Module 8.
 ```

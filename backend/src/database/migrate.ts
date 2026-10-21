@@ -316,6 +316,58 @@ export function runMigrations() {
       console.log('[DB] Standard purchase order seeded.');
     }
   }
+
+  // 8. Seed standard sales orders if none exist and products/customers exist
+  const countSOStmt = db.prepare('SELECT COUNT(*) as count FROM sales_orders');
+  const soResult = countSOStmt.get() as any;
+  const soCount = soResult ? soResult.count : 0;
+
+  if (soCount === 0) {
+    const adminUser = db.prepare("SELECT id FROM users LIMIT 1").get() as any;
+    const adminId = adminUser ? adminUser.id : 'usr_default_admin';
+    const customerRow = db.prepare("SELECT id FROM customers WHERE status = 'ACTIVE' LIMIT 1").get() as any;
+    const products = db.prepare("SELECT id, selling_price FROM products WHERE status = 'ACTIVE' LIMIT 2").all() as any[];
+
+    if (customerRow && products.length > 0) {
+      console.log('[DB] No sales orders found. Seeding initial sales order...');
+      const soId = 'so_seed_001';
+      const orderNumber = 'SO-2026-0001';
+      const p1 = products[0];
+      const p2 = products[1] || products[0];
+      const qty1 = 5;
+      const qty2 = 2;
+      const price1 = Number(p1.selling_price) || 80;
+      const price2 = Number(p2.selling_price) || 50;
+      const total1 = qty1 * price1;
+      const total2 = qty2 * price2;
+      const subtotal = total1 + total2;
+      const tax = Math.round(subtotal * 0.08 * 100) / 100;
+      const total = subtotal + tax;
+
+      db.prepare(`
+        INSERT INTO sales_orders (
+          id, order_number, customer_id, order_date, status,
+          subtotal, tax, discount, total, notes, created_by, created_at, updated_at
+        ) VALUES (
+          ?, ?, ?, date('now'), 'CONFIRMED',
+          ?, ?, 0, ?, 'Standard customer retail order awaiting delivery fulfillment.', ?, datetime('now'), datetime('now')
+        )
+      `).run(soId, orderNumber, customerRow.id, subtotal, tax, total, adminId);
+
+      const insertSOItemStmt = db.prepare(`
+        INSERT INTO sales_order_items (
+          id, sales_order_id, product_id, quantity,
+          unit_price, tax, discount, line_total, created_at
+        ) VALUES (?, ?, ?, ?, ?, 0, 0, ?, datetime('now'))
+      `);
+
+      insertSOItemStmt.run('soi_seed_001', soId, p1.id, qty1, price1, total1);
+      if (products.length > 1) {
+        insertSOItemStmt.run('soi_seed_002', soId, p2.id, qty2, price2, total2);
+      }
+      console.log('[DB] Standard sales order seeded.');
+    }
+  }
 }
 
 // Allow direct execution
