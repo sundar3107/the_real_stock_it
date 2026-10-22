@@ -67,7 +67,7 @@ export const AppLayout: React.FC = () => {
                 <span>Upcoming SCM Modules</span>
               </div>
               <div className="px-3 py-1 text-xs text-slate-400 italic">
-                Module 9: Dashboard & Reporting in queue.
+                Module 10: Notifications & Activity Audit Trail in queue.
               </div>
             </div>
           </nav>
@@ -80,7 +80,7 @@ export const AppLayout: React.FC = () => {
       </div>
 
       <footer className="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
-        Stock Management System &bull; SCM Project Baseline &bull; Module 8: Invoice Management
+        Stock Management System &bull; SCM Project Baseline &bull; Module 9: Executive Dashboard
       </footer>
     </div>
   );

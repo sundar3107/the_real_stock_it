@@ -2425,6 +2425,232 @@ async function runAllTests() {
       `Expected status 200 across existing modules, got sales=${salesHealthRes.status}, inv=${inventoryHealthRes.status}, prod=${productsHealthRes.status}`
     );
 
+    // ====================================================
+    // MODULE 9: DASHBOARD
+    // ====================================================
+    console.log('\n--- MODULE 9: DASHBOARD ---');
+
+    // TEST 96: GET /api/dashboard/summary (Overall cross-module aggregation)
+    const dashSummaryRes = await makeRequest(
+      port,
+      'GET',
+      '/api/dashboard/summary',
+      undefined,
+      adminToken
+    );
+    assert(
+      dashSummaryRes.status === 200 &&
+        dashSummaryRes.body.success === true &&
+        dashSummaryRes.body.data.products &&
+        dashSummaryRes.body.data.products.total >= 1 &&
+        dashSummaryRes.body.data.inventory &&
+        dashSummaryRes.body.data.suppliers &&
+        dashSummaryRes.body.data.customers &&
+        dashSummaryRes.body.data.purchases &&
+        dashSummaryRes.body.data.sales &&
+        dashSummaryRes.body.data.invoices,
+      'TEST 96: GET /api/dashboard/summary (Overall cross-module aggregation)',
+      `Expected status 200 with all module summaries, got ${dashSummaryRes.status}`
+    );
+
+    // TEST 97: GET /api/dashboard/inventory (Inventory summary, stock alerts, and category distributions)
+    const dashInvRes = await makeRequest(
+      port,
+      'GET',
+      '/api/dashboard/inventory',
+      undefined,
+      inventoryManagerToken
+    );
+    assert(
+      dashInvRes.status === 200 &&
+        dashInvRes.body.success === true &&
+        dashInvRes.body.data.metrics &&
+        Array.isArray(dashInvRes.body.data.low_stock_products) &&
+        Array.isArray(dashInvRes.body.data.out_of_stock_products) &&
+        Array.isArray(dashInvRes.body.data.stock_by_category),
+      'TEST 97: GET /api/dashboard/inventory (Inventory summary, stock alerts, and category distributions)',
+      `Expected status 200 with inventory alerts and categories, got ${dashInvRes.status}`
+    );
+
+    // TEST 98: GET /api/dashboard/sales (Sales summary, recent orders, and revenue trends)
+    const dashSalesRes = await makeRequest(
+      port,
+      'GET',
+      '/api/dashboard/sales',
+      undefined,
+      salesManagerToken
+    );
+    assert(
+      dashSalesRes.status === 200 &&
+        dashSalesRes.body.success === true &&
+        dashSalesRes.body.data.metrics &&
+        dashSalesRes.body.data.metrics.total_orders >= 1 &&
+        Array.isArray(dashSalesRes.body.data.recent_orders) &&
+        Array.isArray(dashSalesRes.body.data.monthly_trend),
+      'TEST 98: GET /api/dashboard/sales (Sales summary, recent orders, and revenue trends)',
+      `Expected status 200 with sales metrics and recent orders, got ${dashSalesRes.status}`
+    );
+
+    // TEST 99: GET /api/dashboard/purchases (Purchases summary, pending orders, and spend trends)
+    const dashPurchasesRes = await makeRequest(
+      port,
+      'GET',
+      '/api/dashboard/purchases',
+      undefined,
+      purchaseManagerToken
+    );
+    assert(
+      dashPurchasesRes.status === 200 &&
+        dashPurchasesRes.body.success === true &&
+        dashPurchasesRes.body.data.metrics &&
+        dashPurchasesRes.body.data.metrics.total_orders >= 1 &&
+        Array.isArray(dashPurchasesRes.body.data.pending_orders) &&
+        Array.isArray(dashPurchasesRes.body.data.recent_orders) &&
+        Array.isArray(dashPurchasesRes.body.data.monthly_trend),
+      'TEST 99: GET /api/dashboard/purchases (Purchases summary, pending orders, and spend trends)',
+      `Expected status 200 with purchase metrics and pending orders, got ${dashPurchasesRes.status}`
+    );
+
+    // TEST 100: GET /api/dashboard/recent (Unified chronological cross-module activity feed)
+    const dashRecentRes = await makeRequest(
+      port,
+      'GET',
+      '/api/dashboard/recent?limit=10',
+      undefined,
+      adminToken
+    );
+    assert(
+      dashRecentRes.status === 200 &&
+        dashRecentRes.body.success === true &&
+        Array.isArray(dashRecentRes.body.data) &&
+        dashRecentRes.body.data.length > 0 &&
+        dashRecentRes.body.data[0].id &&
+        dashRecentRes.body.data[0].type &&
+        dashRecentRes.body.data[0].title &&
+        dashRecentRes.body.data[0].timestamp,
+      'TEST 100: GET /api/dashboard/recent (Unified chronological cross-module activity feed)',
+      `Expected status 200 with chronological activity items, got ${dashRecentRes.status}`
+    );
+
+    // TEST 101: GET /api/dashboard/charts (Aggregate chart telemetry: trends, stock distribution, categories)
+    const dashChartsRes = await makeRequest(
+      port,
+      'GET',
+      '/api/dashboard/charts',
+      undefined,
+      adminToken
+    );
+    assert(
+      dashChartsRes.status === 200 &&
+        dashChartsRes.body.success === true &&
+        Array.isArray(dashChartsRes.body.data.sales_vs_purchases) &&
+        Array.isArray(dashChartsRes.body.data.stock_status_distribution) &&
+        Array.isArray(dashChartsRes.body.data.category_distribution) &&
+        dashChartsRes.body.data.stock_status_distribution.length === 3,
+      'TEST 101: GET /api/dashboard/charts (Aggregate chart telemetry: trends, stock distribution, categories)',
+      `Expected status 200 with chart datasets, got ${dashChartsRes.status}`
+    );
+
+    // TEST 102: Role-based dashboard access & unauthenticated rejection
+    const unauthDashRes = await makeRequest(
+      port,
+      'GET',
+      '/api/dashboard/summary',
+      undefined,
+      undefined
+    );
+    const viewerDashRes = await makeRequest(
+      port,
+      'GET',
+      '/api/dashboard/summary',
+      undefined,
+      viewerToken
+    );
+    const inventoryMgrDashRes = await makeRequest(
+      port,
+      'GET',
+      '/api/dashboard/inventory',
+      undefined,
+      inventoryManagerToken
+    );
+    const salesMgrDashRes = await makeRequest(
+      port,
+      'GET',
+      '/api/dashboard/sales',
+      undefined,
+      salesManagerToken
+    );
+    const purchaseMgrDashRes = await makeRequest(
+      port,
+      'GET',
+      '/api/dashboard/purchases',
+      undefined,
+      purchaseManagerToken
+    );
+    assert(
+      unauthDashRes.status === 401 &&
+        viewerDashRes.status === 200 &&
+        inventoryMgrDashRes.status === 200 &&
+        salesMgrDashRes.status === 200 &&
+        purchaseMgrDashRes.status === 200,
+      'TEST 102: Role-based dashboard access & unauthenticated rejection (401 unauthenticated, 200 for all authenticated roles)',
+      `Expected unauth=401, viewer=200, invMgr=200, salesMgr=200, purchaseMgr=200, got unauth=${unauthDashRes.status}, viewer=${viewerDashRes.status}`
+    );
+
+    // TEST 103: CRITICAL SCM INVARIANT: Dashboard operations are strictly read-only and DO NOT modify business data
+    const prodCountBefore = (await makeRequest(port, 'GET', '/api/products', undefined, adminToken)).body.data.total;
+    const invBalanceBefore = (await makeRequest(port, 'GET', `/api/inventory/item/${testPoProductId}`, undefined, adminToken)).body.data.current_quantity;
+    const soCountBefore = (await makeRequest(port, 'GET', '/api/sales', undefined, adminToken)).body.data.total;
+    const poCountBefore = (await makeRequest(port, 'GET', '/api/purchases', undefined, adminToken)).body.data.total;
+    const invCountBefore = (await makeRequest(port, 'GET', '/api/invoices', undefined, adminToken)).body.data.total;
+
+    // Trigger all dashboard endpoints repeatedly
+    await makeRequest(port, 'GET', '/api/dashboard/summary', undefined, adminToken);
+    await makeRequest(port, 'GET', '/api/dashboard/inventory', undefined, adminToken);
+    await makeRequest(port, 'GET', '/api/dashboard/sales', undefined, adminToken);
+    await makeRequest(port, 'GET', '/api/dashboard/purchases', undefined, adminToken);
+    await makeRequest(port, 'GET', '/api/dashboard/recent', undefined, adminToken);
+    await makeRequest(port, 'GET', '/api/dashboard/charts', undefined, adminToken);
+
+    const prodCountAfter = (await makeRequest(port, 'GET', '/api/products', undefined, adminToken)).body.data.total;
+    const invBalanceAfter = (await makeRequest(port, 'GET', `/api/inventory/item/${testPoProductId}`, undefined, adminToken)).body.data.current_quantity;
+    const soCountAfter = (await makeRequest(port, 'GET', '/api/sales', undefined, adminToken)).body.data.total;
+    const poCountAfter = (await makeRequest(port, 'GET', '/api/purchases', undefined, adminToken)).body.data.total;
+    const invCountAfter = (await makeRequest(port, 'GET', '/api/invoices', undefined, adminToken)).body.data.total;
+
+    assert(
+      prodCountBefore === prodCountAfter &&
+        invBalanceBefore === invBalanceAfter &&
+        soCountBefore === soCountAfter &&
+        poCountBefore === poCountAfter &&
+        invCountBefore === invCountAfter,
+      'TEST 103: CRITICAL SCM INVARIANT: Dashboard operations are strictly read-only and DO NOT modify business data',
+      `Expected zero data changes across all modules after querying dashboard telemetry`
+    );
+
+    // TEST 104: Regression verification: Existing Modules 1 through 8 remain 100% operational
+    const m1Auth = await makeRequest(port, 'GET', '/api/auth/me', undefined, adminToken);
+    const m2Prod = await makeRequest(port, 'GET', '/api/products', undefined, adminToken);
+    const m3Inv = await makeRequest(port, 'GET', '/api/inventory', undefined, adminToken);
+    const m4Supp = await makeRequest(port, 'GET', '/api/suppliers', undefined, adminToken);
+    const m5Cust = await makeRequest(port, 'GET', '/api/customers', undefined, adminToken);
+    const m6Purch = await makeRequest(port, 'GET', '/api/purchases', undefined, adminToken);
+    const m7Sales = await makeRequest(port, 'GET', '/api/sales', undefined, adminToken);
+    const m8Invoices = await makeRequest(port, 'GET', '/api/invoices', undefined, adminToken);
+
+    assert(
+      m1Auth.status === 200 &&
+        m2Prod.status === 200 &&
+        m3Inv.status === 200 &&
+        m4Supp.status === 200 &&
+        m5Cust.status === 200 &&
+        m6Purch.status === 200 &&
+        m7Sales.status === 200 &&
+        m8Invoices.status === 200,
+      'TEST 104: Regression verification: Existing Modules 1 through 8 remain 100% operational',
+      `Expected 200 OK across all prior modules 1-8`
+    );
+
   } finally {
     server.close();
   }

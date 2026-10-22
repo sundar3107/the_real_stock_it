@@ -5,7 +5,7 @@ import { ProtectedRoute } from './modules/authentication/components/ProtectedRou
 import { AppLayout } from './components/layout/AppLayout';
 import { LoginPage } from './modules/authentication/pages/LoginPage';
 import { RegisterPage } from './modules/authentication/pages/RegisterPage';
-import { WelcomeDashboardPage } from './modules/authentication/pages/WelcomeDashboardPage';
+import { DashboardPage } from './modules/dashboard/pages/DashboardPage';
 import { ProfilePage } from './modules/authentication/pages/ProfilePage';
 import { ProductsPage } from './modules/products/pages/ProductsPage';
 import { InventoryPage } from './modules/inventory/pages/InventoryPage';
@@ -32,7 +32,7 @@ export const App: React.FC = () => {
               </ProtectedRoute>
             }
           >
-            <Route path="/dashboard" element={<WelcomeDashboardPage />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/products" element={<ProductsPage />} />
             <Route path="/inventory" element={<InventoryPage />} />
             <Route path="/suppliers" element={<SuppliersPage />} />

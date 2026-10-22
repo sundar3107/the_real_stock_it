@@ -2,8 +2,8 @@
 
 > **Target Audience:** Incoming Software Engineer / AI Agent in Google Antigravity.  
 > **Repository Root:** `C:\Users\abish\.gemini\antigravity\scratch\the_real_stock_it\`  
-> **Status:** Modules 1 through 8 are **100% completed, tested, and verified** (95/95 automated tests passing).  
-> **Next Module in Queue:** **Module 9: Dashboard & Reporting / Analytics**.
+> **Status:** Modules 1 through 9 are **100% completed, tested, and verified** (104/104 automated tests passing).  
+> **Next Module in Queue:** **Module 10: Notifications & Activity Audit Trail**.
 
 ---
 
@@ -114,7 +114,7 @@ the_real_stock_it/
 │   │   ├── app.ts                      # Express app factory & route mounting
 │   │   └── server.ts                   # Server entrypoint
 │   └── tests/
-│       └── run_tests.js                # 83-test comprehensive verification suite
+│       └── run_tests.js            # 104-test comprehensive verification suite
 ├── frontend/
 │   ├── src/
 │   │   ├── components/                 # Shared UI (AppLayout, Navbar, Sidebar, etc.)
@@ -231,6 +231,41 @@ the_real_stock_it/
 - **Authorization**:
   - `ADMIN` & `SALES_MANAGER`: Full management access (create, edit drafts, change status, cancel).
   - `INVENTORY_MANAGER`, `PURCHASE_MANAGER`, & `VIEWER`: Read-only access (`invoice:read`).
+
+---
+
+### Module 9: Executive Dashboard (COMPLETED)
+- **Features**: Real-time cross-module operational telemetry aggregating Products, Inventory, Suppliers, Customers, Purchases, Sales, and Invoices.
+- **Summary KPI Cards**:
+  - Products catalog (total, active, inactive).
+  - Physical inventory stock units & items count.
+  - Stock health alerts (low stock warning count & out of stock count).
+  - Commercial sales revenue ($) and fulfilled orders count.
+  - Commercial billing invoices (total, issued, and paid value).
+  - Procurement purchase spend ($) and pending orders count.
+  - Active suppliers and customer accounts.
+  - Quick action links pointing directly to underlying management modules.
+- **Dedicated Operational Summaries**:
+  - **Inventory Summary**: Stock metrics, low-stock reorder table, out-of-stock product alerts, and category stock distribution.
+  - **Sales Summary**: Sales metrics, recent sales orders table, and monthly revenue trends.
+  - **Purchasing Summary**: Procurement metrics, pending purchase orders table, and monthly spend trends.
+- **Unified Chronological System Activity**:
+  - Live cross-module event feed combining recent stock transactions (Stock IN, Stock OUT, adjustments), recent sales orders, purchase receipts, invoice billings, and new products.
+- **Visual Chart Telemetry (Zero External Dependencies)**:
+  - Responsive SVG Sales vs. Purchase spend comparative trend chart.
+  - Multi-segment stock status distribution bar (In Stock vs. Low Stock vs. Out of Stock).
+  - Category stock volume breakdown bars.
+- **Role-Aware Dashboard & RBAC**:
+  - Role-tailored default views:
+    - `INVENTORY_MANAGER` defaults to Inventory & Stock alerts.
+    - `SALES_MANAGER` defaults to Sales & Billing.
+    - `PURCHASE_MANAGER` defaults to Purchasing & Procurement.
+    - `ADMIN` & `VIEWER` default to the Full Overview.
+  - Interactive tabs allow authorized users to switch between Operational Overview, Inventory, Sales, Purchases, and Activity.
+  - All write operations are strictly forbidden on dashboard routes (100% read-only).
+- **CRITICAL SCM RULE & INVARIANT**:
+  - The dashboard is purely a read-focused aggregation layer.
+  - **It NEVER mutates or creates business data, ledger entries, or stock quantities.**
 
 ---
 
@@ -608,14 +643,24 @@ All routes return JSON with a standard envelope:
 
 ---
 
+### Dashboard (`/api/dashboard`)
+- `GET /api/dashboard/summary` - High-level cross-module summary metrics (products, inventory, suppliers, customers, purchases, sales, invoices)
+- `GET /api/dashboard/inventory` - Inventory overview, low-stock items, out-of-stock products, category breakdown
+- `GET /api/dashboard/sales` - Sales performance metrics, top recent sales orders, monthly revenue trend
+- `GET /api/dashboard/purchases` - Procurement metrics, pending purchase orders, monthly spend trend
+- `GET /api/dashboard/recent` - Chronological cross-module activity stream (stock movements, sales, purchases, invoices)
+- `GET /api/dashboard/charts` - Dataset for visual trends (sales vs purchases, stock health distribution, category units)
+
+---
+
 ## 7. Verification & Testing
 
-The repository includes a comprehensive 95-test integration suite:
+The repository includes a comprehensive 104-test integration suite:
 ```powershell
 # Run from backend directory:
 npm test
 ```
-**Current Test Coverage Breakdown (95/95 Passing):**
+**Current Test Coverage Breakdown (104/104 Passing):**
 - **Tests 1–14**: Authentication, invalid passwords, email collision, profile isolation, bcrypt verification, role assignment.
 - **Tests 15–24**: Category uniqueness, product creation, duplicate SKU rejection, price validation, search/filters, soft delete.
 - **Tests 25–35**: Inventory initialization, Stock IN/OUT, negative stock prevention, adjustments, status state machines, ledger logging.
@@ -665,39 +710,49 @@ npm test
 
 ---
 
+- **Tests 96–104**: Executive Dashboard:
+  - `GET /api/dashboard/summary`: Verified aggregate metrics across all 7 operational modules.
+  - `GET /api/dashboard/inventory`: Verified stock health alerts, low-stock items list, out-of-stock alerts, and category distributions.
+  - `GET /api/dashboard/sales`: Verified sales performance metrics, recent sales orders, and monthly revenue trends.
+  - `GET /api/dashboard/purchases`: Verified purchase spend metrics, pending orders, and spend trends.
+  - `GET /api/dashboard/recent`: Verified unified chronological cross-module activity feed sorted descending.
+  - `GET /api/dashboard/charts`: Verified comparative trend datasets, stock status distribution percentages, and category units.
+  - Role-based authorization: Verified access for all authenticated roles (`ADMIN`, `INVENTORY_MANAGER`, `SALES_MANAGER`, `PURCHASE_MANAGER`, `VIEWER`) and rejection of unauthenticated requests (`401 Unauthorized`).
+  - **CRITICAL SCM INVARIANT**: Verified that querying dashboard endpoints is strictly read-only and causes **ZERO modifications** to underlying products, inventory balances, transactions, sales, purchases, or invoices.
+  - Regression check: Verified that existing Modules 1 through 8 remain 100% operational.
+
+---
+
 ## 8. Remaining Modules Roadmap (For Subsequent Sprints)
 
-The planned remaining modules for the SCM project are:
-1. **Module 9: Dashboard & Reporting / Analytics** *(Next to implement)*
-   - Executive dashboard aggregating Inventory, Sales, Purchases, and Financial health.
-   - Real-time KPI summary cards (Total Revenue, Orders Fulfilled, Invoiced Value, Low Stock Alerts).
-   - Visual charts (Sales Trends, Category-wise Stock Breakdown, Top-selling Products).
-   - Stock valuation reports, fast/slow moving items, and supplier performance.
-2. **Module 10: Notifications & Activity Audit Trail**
-   - Low stock notifications, out of stock alerts, order status notifications, global audit log.
+The planned remaining module for the SCM project is:
+1. **Module 10: Notifications & Activity Audit Trail** *(Next to implement)*
+   - Low stock notifications, out of stock alerts, and reorder point threshold triggers.
+   - System event logging, global administrative audit trail, and user activity history.
 
 ---
 
 ## 9. Prompt to Hand Over to the Next Antigravity Session
 
-Copy and paste the prompt in the box below to start Module 9 in Antigravity:
+Copy and paste the prompt in the box below to start Module 10 in Antigravity:
 
 ```markdown
 Hello Antigravity! I am continuing development of our web-based Stock Management System (SCM project).
 
-The previous developer completed Modules 1 through 8 (Authentication, Products, Inventory, Suppliers, Customers, Purchases, Sales Management, and Invoice Management).
-All 95 existing automated tests are passing in `backend/tests/run_tests.js`.
+The previous developer completed Modules 1 through 9 (Authentication, Products, Inventory, Suppliers, Customers, Purchases, Sales Management, Invoice Management, and Executive Dashboard).
+All 104 existing automated tests are passing in `backend/tests/run_tests.js`.
 Full technical and architectural specifications are documented in `PROJECT_HANDOVER_SPEC.md` at the project root.
 
 Please inspect the existing architecture, database schema (`backend/src/database/schema.sql`), and API patterns.
 
-We are now ready to implement ONLY the next module:
-🚀 MODULE 9: DASHBOARD & REPORTING / ANALYTICS
+We are now ready to implement ONLY the final module:
+🔔 MODULE 10: NOTIFICATIONS & ACTIVITY AUDIT TRAIL
 
 Requirements:
 - Follow all existing patterns (TypeScript, Express, node:sqlite, React, Tailwind).
 - Maintain high cohesion, low coupling, and role-based permissions.
-- Aggregate metrics across Products, Inventory, Suppliers, Customers, Purchases, Sales, and Invoices.
-- Do not break or regress any existing modules (preserve 95/95 tests and add new tests for Module 9).
-- Please confirm you have inspected the project and are ready to implement Module 9.
+- Provide automated low-stock and out-of-stock notifications.
+- Provide centralized audit logging and administrative activity trail.
+- Do not break or regress any existing modules (preserve 104/104 tests and add new tests for Module 10).
+- Please confirm you have inspected the project and are ready to implement Module 10.
 ```

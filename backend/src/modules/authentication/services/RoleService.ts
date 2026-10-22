@@ -11,6 +11,7 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     '*', // Wildcard: Full administrative power
   ],
   INVENTORY_MANAGER: [
+    'dashboard:read',
     'product:read',
     'product:create',
     'product:update',
@@ -27,6 +28,7 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'report:inventory',
   ],
   SALES_MANAGER: [
+    'dashboard:read',
     'product:read',
     'inventory:read',
     'supplier:read',
@@ -46,6 +48,7 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'report:sales',
   ],
   PURCHASE_MANAGER: [
+    'dashboard:read',
     'product:read',
     'inventory:read',
     'supplier:read',
@@ -62,6 +65,7 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'report:purchases',
   ],
   VIEWER: [
+    'dashboard:read',
     'product:read',
     'inventory:read',
     'supplier:read',
