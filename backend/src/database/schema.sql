@@ -248,3 +248,51 @@ CREATE INDEX IF NOT EXISTS idx_so_created_by ON sales_orders(created_by);
 CREATE INDEX IF NOT EXISTS idx_soi_sales_order_id ON sales_order_items(sales_order_id);
 CREATE INDEX IF NOT EXISTS idx_soi_product_id ON sales_order_items(product_id);
 
+-- 14. Invoices (Module 8)
+CREATE TABLE IF NOT EXISTS invoices (
+    id TEXT PRIMARY KEY,
+    invoice_number TEXT UNIQUE NOT NULL,
+    sales_order_id TEXT,
+    customer_id TEXT NOT NULL,
+    invoice_date TEXT NOT NULL,
+    due_date TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'DRAFT' CHECK(status IN ('DRAFT', 'ISSUED', 'PAID', 'PARTIALLY_PAID', 'CANCELLED')),
+    subtotal REAL NOT NULL DEFAULT 0.0 CHECK(subtotal >= 0),
+    tax REAL NOT NULL DEFAULT 0.0 CHECK(tax >= 0),
+    discount REAL NOT NULL DEFAULT 0.0 CHECK(discount >= 0),
+    total REAL NOT NULL DEFAULT 0.0 CHECK(total >= 0),
+    notes TEXT,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (sales_order_id) REFERENCES sales_orders(id) ON UPDATE CASCADE ON DELETE SET NULL,
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON UPDATE CASCADE ON DELETE RESTRICT,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON UPDATE CASCADE ON DELETE RESTRICT
+);
+
+-- 15. Invoice Items (Module 8)
+CREATE TABLE IF NOT EXISTS invoice_items (
+    id TEXT PRIMARY KEY,
+    invoice_id TEXT NOT NULL,
+    product_id TEXT,
+    description TEXT,
+    quantity INTEGER NOT NULL CHECK(quantity > 0),
+    unit_price REAL NOT NULL DEFAULT 0.0 CHECK(unit_price >= 0),
+    tax REAL NOT NULL DEFAULT 0.0 CHECK(tax >= 0),
+    discount REAL NOT NULL DEFAULT 0.0 CHECK(discount >= 0),
+    line_total REAL NOT NULL DEFAULT 0.0 CHECK(line_total >= 0),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON UPDATE CASCADE ON DELETE RESTRICT
+);
+
+-- Indexes for Invoices & Items
+CREATE INDEX IF NOT EXISTS idx_inv_invoice_number ON invoices(invoice_number);
+CREATE INDEX IF NOT EXISTS idx_inv_sales_order_id ON invoices(sales_order_id);
+CREATE INDEX IF NOT EXISTS idx_inv_customer_id ON invoices(customer_id);
+CREATE INDEX IF NOT EXISTS idx_inv_status ON invoices(status);
+CREATE INDEX IF NOT EXISTS idx_inv_invoice_date ON invoices(invoice_date);
+CREATE INDEX IF NOT EXISTS idx_invi_invoice_id ON invoice_items(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_invi_product_id ON invoice_items(product_id);
+
+

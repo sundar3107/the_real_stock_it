@@ -2,8 +2,8 @@
 
 > **Target Audience:** Incoming Software Engineer / AI Agent in Google Antigravity.  
 > **Repository Root:** `C:\Users\abish\.gemini\antigravity\scratch\the_real_stock_it\`  
-> **Status:** Modules 1 through 7 are **100% completed, tested, and verified** (83/83 automated tests passing).  
-> **Next Module in Queue:** **Module 8: Invoices & Payments / Billing**.
+> **Status:** Modules 1 through 8 are **100% completed, tested, and verified** (95/95 automated tests passing).  
+> **Next Module in Queue:** **Module 9: Dashboard & Reporting / Analytics**.
 
 ---
 
@@ -207,6 +207,30 @@ the_real_stock_it/
   - `ADMIN` & `SALES_MANAGER`: Full management access (create, edit, confirm, complete, cancel).
   - `INVENTORY_MANAGER`: View sales orders and monitor outbound demand.
   - `PURCHASE_MANAGER` & `VIEWER`: Read-only access.
+
+---
+
+### Module 8: Invoice Management (COMPLETED)
+- **Features**: Commercial invoice lifecycle management (`DRAFT`, `ISSUED`, `PAID`, `PARTIALLY_PAID`, `CANCELLED`).
+- **Generation from Sales Orders**:
+  - Auto-populates customer information, billing address, line items (product ID, name/SKU, description, quantity, unit price, tax, discount, line total), subtotal, tax, discount, and grand total.
+  - Generates unique invoice numbers following format `INV-YYYY-XXXX` with sequence checking and cryptographic fallback.
+  - Due date defaults to +30 days from invoice date.
+  - Preview endpoint `GET /api/invoices/preview-sales/:salesOrderId` enables one-click pre-fill in the UI.
+- **Manual Invoice Creation & Draft Editing**:
+  - Custom line items builder with live subtotal, tax, discount, and grand total calculation.
+  - Allows editing items, dates, notes, and financial adjustments while in `DRAFT` status.
+- **CRITICAL SCM RULE & INVENTORY PROTECTION**:
+  - Invoices strictly own `invoices` and `invoice_items`.
+  - **Invoices NEVER modify physical inventory balances or create stock transactions.**
+  - Outbound physical stock depletion was executed in Module 7 during sales completion (`Sales → Inventory Stock OUT`; `Invoice → Documentation of Sale`).
+  - Idempotent and non-destructive: historical invoices are never deleted destructively; cancellations transition status to `CANCELLED`.
+- **Printable Layout & Presentation**:
+  - Print-friendly professional invoice layout (`InvoicePrintView`) with corporate header, bill-to metadata, line items breakdown, financial summaries, and payment terms.
+  - Integrates with standard browser printing (`window.print()`) with print CSS media styles.
+- **Authorization**:
+  - `ADMIN` & `SALES_MANAGER`: Full management access (create, edit drafts, change status, cancel).
+  - `INVENTORY_MANAGER`, `PURCHASE_MANAGER`, & `VIEWER`: Read-only access (`invoice:read`).
 
 ---
 
@@ -451,6 +475,52 @@ CREATE INDEX IF NOT EXISTS idx_so_order_date ON sales_orders(order_date);
 CREATE INDEX IF NOT EXISTS idx_so_created_by ON sales_orders(created_by);
 CREATE INDEX IF NOT EXISTS idx_soi_sales_order_id ON sales_order_items(sales_order_id);
 CREATE INDEX IF NOT EXISTS idx_soi_product_id ON sales_order_items(product_id);
+-- 14. Invoices (Module 8)
+CREATE TABLE IF NOT EXISTS invoices (
+    id TEXT PRIMARY KEY,
+    invoice_number TEXT UNIQUE NOT NULL,
+    sales_order_id TEXT,
+    customer_id TEXT NOT NULL,
+    invoice_date TEXT NOT NULL,
+    due_date TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'DRAFT' CHECK(status IN ('DRAFT', 'ISSUED', 'PAID', 'PARTIALLY_PAID', 'CANCELLED')),
+    subtotal REAL NOT NULL DEFAULT 0.0 CHECK(subtotal >= 0),
+    tax REAL NOT NULL DEFAULT 0.0 CHECK(tax >= 0),
+    discount REAL NOT NULL DEFAULT 0.0 CHECK(discount >= 0),
+    total REAL NOT NULL DEFAULT 0.0 CHECK(total >= 0),
+    notes TEXT,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (sales_order_id) REFERENCES sales_orders(id) ON UPDATE CASCADE ON DELETE SET NULL,
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON UPDATE CASCADE ON DELETE RESTRICT,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON UPDATE CASCADE ON DELETE RESTRICT
+);
+
+-- 15. Invoice Items (Module 8)
+CREATE TABLE IF NOT EXISTS invoice_items (
+    id TEXT PRIMARY KEY,
+    invoice_id TEXT NOT NULL,
+    product_id TEXT,
+    description TEXT,
+    quantity INTEGER NOT NULL CHECK(quantity > 0),
+    unit_price REAL NOT NULL DEFAULT 0.0 CHECK(unit_price >= 0),
+    tax REAL NOT NULL DEFAULT 0.0 CHECK(tax >= 0),
+    discount REAL NOT NULL DEFAULT 0.0 CHECK(discount >= 0),
+    line_total REAL NOT NULL DEFAULT 0.0 CHECK(line_total >= 0),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON UPDATE CASCADE ON DELETE RESTRICT
+);
+
+-- Indexes for Invoices & Items
+CREATE INDEX IF NOT EXISTS idx_inv_invoice_number ON invoices(invoice_number);
+CREATE INDEX IF NOT EXISTS idx_inv_sales_order_id ON invoices(sales_order_id);
+CREATE INDEX IF NOT EXISTS idx_inv_customer_id ON invoices(customer_id);
+CREATE INDEX IF NOT EXISTS idx_inv_status ON invoices(status);
+CREATE INDEX IF NOT EXISTS idx_inv_invoice_date ON invoices(invoice_date);
+CREATE INDEX IF NOT EXISTS idx_invi_invoice_id ON invoice_items(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_invi_product_id ON invoice_items(product_id);
 ```
 
 ---
@@ -527,14 +597,25 @@ All routes return JSON with a standard envelope:
 
 ---
 
+### Invoices (`/api/invoices`)
+- `GET /api/invoices` - List commercial invoices with search, customer, status, date filters, and pagination
+- `GET /api/invoices/metrics` - Aggregate metrics (Total invoices, draft, issued, paid, partially paid, cancelled, total invoiced value, total paid value)
+- `GET /api/invoices/preview-sales/:salesOrderId` - Preview draft invoice generated from Sales Order
+- `GET /api/invoices/:id` - Get full invoice details including customer contact, line items, and sales order linkage
+- `POST /api/invoices` - Create commercial invoice (supports direct creation or generation from `sales_order_id`)
+- `PUT /api/invoices/:id` - Update draft invoice details, notes, and line items (restricted to `DRAFT` status)
+- `PATCH /api/invoices/:id/status` - Transition invoice workflow status (`DRAFT` -> `ISSUED` -> `PAID`, `PARTIALLY_PAID`, `CANCELLED`)
+
+---
+
 ## 7. Verification & Testing
 
-The repository includes a comprehensive 83-test integration suite:
+The repository includes a comprehensive 95-test integration suite:
 ```powershell
 # Run from backend directory:
 npm test
 ```
-**Current Test Coverage Breakdown (83/83 Passing):**
+**Current Test Coverage Breakdown (95/95 Passing):**
 - **Tests 1–14**: Authentication, invalid passwords, email collision, profile isolation, bcrypt verification, role assignment.
 - **Tests 15–24**: Category uniqueness, product creation, duplicate SKU rejection, price validation, search/filters, soft delete.
 - **Tests 25–35**: Inventory initialization, Stock IN/OUT, negative stock prevention, adjustments, status state machines, ledger logging.
@@ -568,42 +649,55 @@ npm test
 
 ---
 
+- **Tests 84–95**: Invoice Management:
+  - Invoices seed and aggregate metrics query verification.
+  - Preview invoice generation from sales order (`GET /api/invoices/preview-sales/:salesOrderId`).
+  - Create invoice from completed sales order with auto-populated items and financial calculations.
+  - Get full invoice details by ID with customer and sales order linkage.
+  - Validation check: rejection of missing customer, empty line items, and negative quantities.
+  - Validation check: unique invoice number enforcement (`409 Conflict`).
+  - Draft editing and recalculation of subtotal, tax, discount, and grand total.
+  - Status transition state machine (`DRAFT` -> `ISSUED` -> `PAID`) and rejection of illegal transitions from terminal status.
+  - Cancellation state machine (`DRAFT` -> `CANCELLED`).
+  - **CRITICAL SCM INVARIANT**: Verified that invoice creation and status updates **DO NOT** modify physical inventory stock balance or generate stock transactions.
+  - Role-based authorization: VIEWER can read invoices, but is forbidden (403) from creating, editing, or updating status.
+  - Regression check: Sales, Inventory, and Products modules remain 100% operational.
+
+---
+
 ## 8. Remaining Modules Roadmap (For Subsequent Sprints)
 
 The planned remaining modules for the SCM project are:
-1. **Module 8: Invoices & Payments / Billing** *(Next to implement)*
-   - Invoicing for purchases (Accounts Payable) and sales (Accounts Receivable).
-   - Linking invoices to Purchase Orders (Module 6) and Sales Orders (Module 7).
-   - Payment status tracking (`UNPAID`, `PARTIALLY_PAID`, `PAID`, `OVERDUE`).
-   - Payment method recording (Cash, Bank Transfer, Cheque, UPI).
-2. **Module 9: Dashboard & Reporting / Analytics**
+1. **Module 9: Dashboard & Reporting / Analytics** *(Next to implement)*
    - Executive dashboard aggregating Inventory, Sales, Purchases, and Financial health.
-   - Stock valuation, fast/slow moving items, turnover rate, and supplier performance.
-3. **Module 10: Notifications & Activity Audit Trail**
+   - Real-time KPI summary cards (Total Revenue, Orders Fulfilled, Invoiced Value, Low Stock Alerts).
+   - Visual charts (Sales Trends, Category-wise Stock Breakdown, Top-selling Products).
+   - Stock valuation reports, fast/slow moving items, and supplier performance.
+2. **Module 10: Notifications & Activity Audit Trail**
    - Low stock notifications, out of stock alerts, order status notifications, global audit log.
 
 ---
 
 ## 9. Prompt to Hand Over to the Next Antigravity Session
 
-Copy and paste the prompt in the box below to start Module 8 in Antigravity:
+Copy and paste the prompt in the box below to start Module 9 in Antigravity:
 
 ```markdown
 Hello Antigravity! I am continuing development of our web-based Stock Management System (SCM project).
 
-The previous developer completed Modules 1 through 7 (Authentication, Products, Inventory, Suppliers, Customers, Purchases, and Sales Management).
-All 83 existing automated tests are passing in `backend/tests/run_tests.js`.
+The previous developer completed Modules 1 through 8 (Authentication, Products, Inventory, Suppliers, Customers, Purchases, Sales Management, and Invoice Management).
+All 95 existing automated tests are passing in `backend/tests/run_tests.js`.
 Full technical and architectural specifications are documented in `PROJECT_HANDOVER_SPEC.md` at the project root.
 
 Please inspect the existing architecture, database schema (`backend/src/database/schema.sql`), and API patterns.
 
 We are now ready to implement ONLY the next module:
-👉 MODULE 8: INVOICES & PAYMENTS / BILLING
+🚀 MODULE 9: DASHBOARD & REPORTING / ANALYTICS
 
 Requirements:
 - Follow all existing patterns (TypeScript, Express, node:sqlite, React, Tailwind).
-- Maintain high cohesion, low coupling, soft-deactivation, and role-based permissions.
-- Invoices link to completed Purchase Orders (AP) and Sales Orders (AR).
-- Do not break or regress any existing modules (preserve 83/83 tests and add new tests for Module 8).
-- Please confirm you have inspected the project and are ready to implement Module 8.
+- Maintain high cohesion, low coupling, and role-based permissions.
+- Aggregate metrics across Products, Inventory, Suppliers, Customers, Purchases, Sales, and Invoices.
+- Do not break or regress any existing modules (preserve 95/95 tests and add new tests for Module 9).
+- Please confirm you have inspected the project and are ready to implement Module 9.
 ```

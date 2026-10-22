@@ -368,6 +368,59 @@ export function runMigrations() {
       console.log('[DB] Standard sales order seeded.');
     }
   }
+
+  // 9. Seed standard invoice if none exist and sales order exists
+  const countInvStmt = db.prepare('SELECT COUNT(*) as count FROM invoices');
+  const invResult = countInvStmt.get() as any;
+  const invCount = invResult ? invResult.count : 0;
+
+  if (invCount === 0) {
+    const adminUser = db.prepare("SELECT id FROM users LIMIT 1").get() as any;
+    const adminId = adminUser ? adminUser.id : 'usr_default_admin';
+    const soRow = db.prepare("SELECT * FROM sales_orders LIMIT 1").get() as any;
+
+    if (soRow) {
+      console.log('[DB] No invoices found. Seeding initial invoice...');
+      const invId = 'inv_seed_001';
+      const invoiceNumber = 'INV-2026-0001';
+      const soItems = db.prepare("SELECT * FROM sales_order_items WHERE sales_order_id = ?").all(soRow.id) as any[];
+
+      db.prepare(`
+        INSERT INTO invoices (
+          id, invoice_number, sales_order_id, customer_id, invoice_date, due_date, status,
+          subtotal, tax, discount, total, notes, created_by, created_at, updated_at
+        ) VALUES (
+          ?, ?, ?, ?, date('now'), date('now', '+30 days'), 'ISSUED',
+          ?, ?, ?, ?, 'Initial commercial invoice for customer fulfillment.', ?, datetime('now'), datetime('now')
+        )
+      `).run(invId, invoiceNumber, soRow.id, soRow.customer_id, soRow.subtotal, soRow.tax, soRow.discount, soRow.total, adminId);
+
+      const insertInvItemStmt = db.prepare(`
+        INSERT INTO invoice_items (
+          id, invoice_id, product_id, description, quantity,
+          unit_price, tax, discount, line_total, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      `);
+
+      for (let i = 0; i < soItems.length; i++) {
+        const item = soItems[i];
+        const p = db.prepare("SELECT name FROM products WHERE id = ?").get(item.product_id) as any;
+        const desc = p ? p.name : 'Product line item';
+        insertInvItemStmt.run(
+          `invi_seed_${String(i + 1).padStart(3, '0')}`,
+          invId,
+          item.product_id,
+          desc,
+          item.quantity,
+          item.unit_price,
+          item.tax,
+          item.discount,
+          item.line_total
+        );
+      }
+      console.log('[DB] Standard commercial invoice seeded.');
+    }
+  }
 }
 
 // Allow direct execution

@@ -9,6 +9,7 @@ import {
   Users,
   ShoppingBag,
   TrendingUp,
+  Receipt,
   UserCheck,
   Layers,
 } from 'lucide-react';
@@ -24,6 +25,7 @@ export const AppLayout: React.FC = () => {
     { label: 'Customers', path: '/customers', icon: Users },
     { label: 'Purchases', path: '/purchases', icon: ShoppingBag },
     { label: 'Sales', path: '/sales', icon: TrendingUp },
+    { label: 'Invoices', path: '/invoices', icon: Receipt },
     { label: 'My Profile', path: '/profile', icon: UserCheck },
   ];
 
@@ -65,7 +67,7 @@ export const AppLayout: React.FC = () => {
                 <span>Upcoming SCM Modules</span>
               </div>
               <div className="px-3 py-1 text-xs text-slate-400 italic">
-                Sales & Invoicing will link here in future modules.
+                Module 9: Dashboard & Reporting in queue.
               </div>
             </div>
           </nav>
@@ -78,7 +80,7 @@ export const AppLayout: React.FC = () => {
       </div>
 
       <footer className="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
-        Stock Management System &bull; SCM Project Baseline &bull; Module 6: Purchase Management
+        Stock Management System &bull; SCM Project Baseline &bull; Module 8: Invoice Management
       </footer>
     </div>
   );

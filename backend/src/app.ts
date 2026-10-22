@@ -9,6 +9,7 @@ import supplierRoutes from './modules/suppliers/routes/supplierRoutes';
 import customerRoutes from './modules/customers/routes/customerRoutes';
 import purchaseRoutes from './modules/purchases/routes/purchaseRoutes';
 import salesRoutes from './modules/sales/routes/salesRoutes';
+import invoiceRoutes from './modules/invoices/routes/invoiceRoutes';
 import { errorHandler } from './middleware/errorHandler';
 
 export function createApp(): Application {
@@ -28,7 +29,7 @@ export function createApp(): Application {
       status: 'OK',
       timestamp: new Date().toISOString(),
       service: 'Stock Management System API',
-      module: 'Module 1: Auth, Module 2: Products, Module 3: Inventory, Module 4: Suppliers, Module 5: Customers, Module 6: Purchases, Module 7: Sales',
+      module: 'Module 1: Auth, Module 2: Products, Module 3: Inventory, Module 4: Suppliers, Module 5: Customers, Module 6: Purchases, Module 7: Sales, Module 8: Invoices',
     });
   });
 
@@ -41,6 +42,7 @@ export function createApp(): Application {
   app.use('/api/customers', customerRoutes);
   app.use('/api/purchases', purchaseRoutes);
   app.use('/api/sales', salesRoutes);
+  app.use('/api/invoices', invoiceRoutes);
 
   // Catch-all 404 handler for unrecognized routes
   app.use((req: Request, res: Response) => {

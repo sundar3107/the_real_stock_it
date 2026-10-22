@@ -2032,6 +2032,399 @@ async function runAllTests() {
       `Expected create=403, complete=403, read=200, got create=${viewerCreateSoRes.status}, complete=${viewerCompleteSoRes.status}, read=${viewerReadSoRes.status}`
     );
 
+    // ====================================================
+    // MODULE 8: INVOICE MANAGEMENT
+    // ====================================================
+    console.log('\n--- MODULE 8: INVOICE MANAGEMENT ---');
+
+    // TEST 84: List invoices & metrics query (Verify seeded invoice exists)
+    const listInvoicesRes = await makeRequest(
+      port,
+      'GET',
+      '/api/invoices',
+      undefined,
+      adminToken
+    );
+    const invoiceMetricsRes = await makeRequest(
+      port,
+      'GET',
+      '/api/invoices/metrics',
+      undefined,
+      adminToken
+    );
+    assert(
+      listInvoicesRes.status === 200 &&
+        listInvoicesRes.body.success === true &&
+        Array.isArray(listInvoicesRes.body.data.items) &&
+        listInvoicesRes.body.data.total >= 1 &&
+        invoiceMetricsRes.status === 200 &&
+        invoiceMetricsRes.body.data.total_invoices >= 1,
+      'TEST 84: List invoices & metrics query (Verify seeded invoice exists)',
+      `Expected status 200 with total invoices >= 1, got list=${listInvoicesRes.status}, metrics=${invoiceMetricsRes.status}`
+    );
+
+    // TEST 85: Preview invoice generated from Sales Order
+    const previewSoInvoiceRes = await makeRequest(
+      port,
+      'GET',
+      `/api/invoices/preview-sales/${createdSoId}`,
+      undefined,
+      salesManagerToken
+    );
+    assert(
+      previewSoInvoiceRes.status === 200 &&
+        previewSoInvoiceRes.body.success === true &&
+        previewSoInvoiceRes.body.data.sales_order_id === createdSoId &&
+        Array.isArray(previewSoInvoiceRes.body.data.items) &&
+        previewSoInvoiceRes.body.data.items.length > 0 &&
+        previewSoInvoiceRes.body.data.total > 0,
+      'TEST 85: Preview invoice generated from Sales Order',
+      `Expected status 200 with preview data for SO #${createdSoId}, got ${previewSoInvoiceRes.status}`
+    );
+
+    // TEST 86: Create invoice from completed sales order (Auto-populates items & totals)
+    const createInvoiceRes = await makeRequest(
+      port,
+      'POST',
+      '/api/invoices',
+      {
+        sales_order_id: createdSoId,
+        invoice_date: '2026-10-22',
+        due_date: '2026-11-22',
+        status: 'ISSUED',
+        notes: 'Commercial invoice generated from completed customer order.',
+      },
+      salesManagerToken
+    );
+    const createdInvoiceId = createInvoiceRes.body?.data?.id;
+    const createdInvoiceNumber = createInvoiceRes.body?.data?.invoice_number;
+    assert(
+      createInvoiceRes.status === 201 &&
+        createInvoiceRes.body.success === true &&
+        createdInvoiceId &&
+        createdInvoiceNumber &&
+        createdInvoiceNumber.startsWith('INV-') &&
+        createInvoiceRes.body.data.sales_order_id === createdSoId &&
+        createInvoiceRes.body.data.status === 'ISSUED' &&
+        Array.isArray(createInvoiceRes.body.data.items) &&
+        createInvoiceRes.body.data.items.length > 0 &&
+        createInvoiceRes.body.data.total > 0,
+      'TEST 86: Create invoice from completed sales order (Auto-populates items & totals)',
+      `Expected status 201 with generated invoice, got status=${createInvoiceRes.status}, body=${JSON.stringify(createInvoiceRes.body)}`
+    );
+
+    // TEST 87: Fetch invoice details by ID (Verify items, customer, and sales order linkage)
+    const getInvoiceRes = await makeRequest(
+      port,
+      'GET',
+      `/api/invoices/${createdInvoiceId}`,
+      undefined,
+      adminToken
+    );
+    assert(
+      getInvoiceRes.status === 200 &&
+        getInvoiceRes.body.success === true &&
+        getInvoiceRes.body.data.id === createdInvoiceId &&
+        getInvoiceRes.body.data.customer &&
+        getInvoiceRes.body.data.customer.id === testSalesCustomerId &&
+        getInvoiceRes.body.data.sales_order &&
+        getInvoiceRes.body.data.sales_order.id === createdSoId &&
+        getInvoiceRes.body.data.items.length > 0,
+      'TEST 87: Fetch invoice details by ID (Verify items, customer, and sales order linkage)',
+      `Expected status 200 with full details, customer, and SO linkage, got ${getInvoiceRes.status}`
+    );
+
+    // TEST 88: Validation check: reject invalid invoice (missing customer, empty items, or negative values)
+    const invalidInvoiceRes = await makeRequest(
+      port,
+      'POST',
+      '/api/invoices',
+      {
+        customer_id: '',
+        items: [],
+      },
+      salesManagerToken
+    );
+    const negativeQtyInvoiceRes = await makeRequest(
+      port,
+      'POST',
+      '/api/invoices',
+      {
+        customer_id: testSalesCustomerId,
+        items: [{ description: 'Invalid item', quantity: -5, unit_price: 100 }],
+      },
+      salesManagerToken
+    );
+    assert(
+      invalidInvoiceRes.status === 400 &&
+        invalidInvoiceRes.body.success === false &&
+        negativeQtyInvoiceRes.status === 400 &&
+        negativeQtyInvoiceRes.body.success === false,
+      'TEST 88: Validation check: reject invalid invoice (missing customer, empty items, or negative values)',
+      `Expected status 400 for invalid invoice payloads, got empty=${invalidInvoiceRes.status}, negativeQty=${negativeQtyInvoiceRes.status}`
+    );
+
+    // TEST 89: Validation check: enforce unique invoice number
+    const duplicateInvNumRes = await makeRequest(
+      port,
+      'POST',
+      '/api/invoices',
+      {
+        invoice_number: createdInvoiceNumber,
+        customer_id: testSalesCustomerId,
+        items: [{ description: 'Duplicate number attempt', quantity: 1, unit_price: 50 }],
+      },
+      salesManagerToken
+    );
+    assert(
+      duplicateInvNumRes.status === 409 &&
+        duplicateInvNumRes.body.success === false &&
+        duplicateInvNumRes.body.message.includes('unique'),
+      'TEST 89: Validation check: enforce unique invoice number',
+      `Expected status 409 rejecting duplicate invoice number, got ${duplicateInvNumRes.status}`
+    );
+
+    // TEST 90: Create, edit, and recalculate draft invoice
+    const draftInvoiceRes = await makeRequest(
+      port,
+      'POST',
+      '/api/invoices',
+      {
+        customer_id: testSalesCustomerId,
+        status: 'DRAFT',
+        items: [
+          { product_id: testPoProductId, description: 'Draft service item', quantity: 2, unit_price: 150.0 },
+        ],
+      },
+      salesManagerToken
+    );
+    const draftInvoiceId = draftInvoiceRes.body?.data?.id;
+
+    const updateDraftRes = await makeRequest(
+      port,
+      'PUT',
+      `/api/invoices/${draftInvoiceId}`,
+      {
+        customer_id: testSalesCustomerId,
+        notes: 'Updated invoice notes with discount applied.',
+        tax: 20.0,
+        discount: 10.0,
+        items: [
+          { product_id: testPoProductId, description: 'Draft item updated', quantity: 3, unit_price: 150.0 },
+        ],
+      },
+      salesManagerToken
+    );
+    // 3 * 150 = 450; +20 tax - 10 discount = 460
+    assert(
+      draftInvoiceRes.status === 201 &&
+        updateDraftRes.status === 200 &&
+        updateDraftRes.body.data.subtotal === 450.0 &&
+        updateDraftRes.body.data.tax === 20.0 &&
+        updateDraftRes.body.data.discount === 10.0 &&
+        updateDraftRes.body.data.total === 460.0 &&
+        updateDraftRes.body.data.items[0].quantity === 3,
+      'TEST 90: Create, edit, and recalculate draft invoice',
+      `Expected status 200 with recalculated totals (460.0), got ${updateDraftRes.status}, total=${updateDraftRes.body?.data?.total}`
+    );
+
+    // TEST 91: Status transitions: DRAFT -> ISSUED -> PAID
+    const issueStatusRes = await makeRequest(
+      port,
+      'PATCH',
+      `/api/invoices/${draftInvoiceId}/status`,
+      { status: 'ISSUED' },
+      salesManagerToken
+    );
+    const paidStatusRes = await makeRequest(
+      port,
+      'PATCH',
+      `/api/invoices/${draftInvoiceId}/status`,
+      { status: 'PAID' },
+      salesManagerToken
+    );
+    const invalidPaidTransitionRes = await makeRequest(
+      port,
+      'PATCH',
+      `/api/invoices/${draftInvoiceId}/status`,
+      { status: 'DRAFT' },
+      salesManagerToken
+    );
+    assert(
+      issueStatusRes.status === 200 &&
+        issueStatusRes.body.data.status === 'ISSUED' &&
+        paidStatusRes.status === 200 &&
+        paidStatusRes.body.data.status === 'PAID' &&
+        invalidPaidTransitionRes.status === 400 &&
+        invalidPaidTransitionRes.body.success === false,
+      'TEST 91: Status transitions: DRAFT -> ISSUED -> PAID and reject illegal transitions from terminal status',
+      `Expected ISSUED=200, PAID=200, PAID->DRAFT=400, got issue=${issueStatusRes.status}, paid=${paidStatusRes.status}, invalid=${invalidPaidTransitionRes.status}`
+    );
+
+    // TEST 92: Status transition: Cancel draft invoice
+    const cancelTargetInvoiceRes = await makeRequest(
+      port,
+      'POST',
+      '/api/invoices',
+      {
+        customer_id: testSalesCustomerId,
+        status: 'DRAFT',
+        items: [{ description: 'Cancellation test', quantity: 1, unit_price: 30 }],
+      },
+      salesManagerToken
+    );
+    const cancelTargetInvoiceId = cancelTargetInvoiceRes.body?.data?.id;
+
+    const cancelStatusRes = await makeRequest(
+      port,
+      'PATCH',
+      `/api/invoices/${cancelTargetInvoiceId}/status`,
+      { status: 'CANCELLED' },
+      salesManagerToken
+    );
+    assert(
+      cancelTargetInvoiceRes.status === 201 &&
+        cancelStatusRes.status === 200 &&
+        cancelStatusRes.body.data.status === 'CANCELLED',
+      'TEST 92: Status transition: Cancel invoice (DRAFT -> CANCELLED)',
+      `Expected status 200 transitioning to CANCELLED, got ${cancelStatusRes.status}`
+    );
+
+    // TEST 93: CRITICAL SCM INVARIANT: Invoice creation and status updates DO NOT modify physical inventory stock balance or audit transactions
+    const invCheckBeforeRes = await makeRequest(
+      port,
+      'GET',
+      `/api/inventory/item/${testPoProductId}`,
+      undefined,
+      adminToken
+    );
+    const stockBalanceBefore = invCheckBeforeRes.body.data.current_quantity;
+
+    const txCheckBeforeRes = await makeRequest(
+      port,
+      'GET',
+      `/api/inventory/transactions?product_id=${testPoProductId}`,
+      undefined,
+      adminToken
+    );
+    const txCountBefore = txCheckBeforeRes.body.data.total;
+
+    // Create a new invoice and transition to PAID
+    const invInvariantRes = await makeRequest(
+      port,
+      'POST',
+      '/api/invoices',
+      {
+        customer_id: testSalesCustomerId,
+        status: 'DRAFT',
+        items: [
+          { product_id: testPoProductId, description: 'Inventory Invariant Check Item', quantity: 5, unit_price: 150.0 },
+        ],
+      },
+      salesManagerToken
+    );
+    const invInvariantId = invInvariantRes.body.data.id;
+    await makeRequest(
+      port,
+      'PATCH',
+      `/api/invoices/${invInvariantId}/status`,
+      { status: 'ISSUED' },
+      salesManagerToken
+    );
+    await makeRequest(
+      port,
+      'PATCH',
+      `/api/invoices/${invInvariantId}/status`,
+      { status: 'PAID' },
+      salesManagerToken
+    );
+
+    const invCheckAfterRes = await makeRequest(
+      port,
+      'GET',
+      `/api/inventory/item/${testPoProductId}`,
+      undefined,
+      adminToken
+    );
+    const stockBalanceAfter = invCheckAfterRes.body.data.current_quantity;
+
+    const txCheckAfterRes = await makeRequest(
+      port,
+      'GET',
+      `/api/inventory/transactions?product_id=${testPoProductId}`,
+      undefined,
+      adminToken
+    );
+    const txCountAfter = txCheckAfterRes.body.data.total;
+
+    assert(
+      stockBalanceBefore === stockBalanceAfter &&
+        txCountBefore === txCountAfter,
+      'TEST 93: CRITICAL SCM INVARIANT: Invoice creation and status updates DO NOT modify physical inventory stock balance or audit transactions',
+      `Expected stock balance (${stockBalanceBefore}) and transaction count (${txCountBefore}) to remain completely unchanged, got stock=${stockBalanceAfter}, tx=${txCountAfter}`
+    );
+
+    // TEST 94: Role-based authorization on Invoices operations (VIEWER can read, but is forbidden from creating/editing)
+    const viewerReadInvoicesRes = await makeRequest(
+      port,
+      'GET',
+      '/api/invoices',
+      undefined,
+      viewerToken
+    );
+    const viewerReadSingleInvoiceRes = await makeRequest(
+      port,
+      'GET',
+      `/api/invoices/${createdInvoiceId}`,
+      undefined,
+      viewerToken
+    );
+    const viewerCreateInvoiceRes = await makeRequest(
+      port,
+      'POST',
+      '/api/invoices',
+      {
+        customer_id: testSalesCustomerId,
+        items: [{ description: 'Unauthorized invoice attempt', quantity: 1, unit_price: 100 }],
+      },
+      viewerToken
+    );
+    const viewerUpdateInvoiceRes = await makeRequest(
+      port,
+      'PUT',
+      `/api/invoices/${createdInvoiceId}`,
+      { customer_id: testSalesCustomerId },
+      viewerToken
+    );
+    const viewerStatusInvoiceRes = await makeRequest(
+      port,
+      'PATCH',
+      `/api/invoices/${createdInvoiceId}/status`,
+      { status: 'PAID' },
+      viewerToken
+    );
+    assert(
+      viewerReadInvoicesRes.status === 200 &&
+        viewerReadSingleInvoiceRes.status === 200 &&
+        viewerCreateInvoiceRes.status === 403 &&
+        viewerUpdateInvoiceRes.status === 403 &&
+        viewerStatusInvoiceRes.status === 403,
+      'TEST 94: Role-based authorization on Invoices operations (VIEWER can read, forbidden 403 on create/edit/status)',
+      `Expected read=200, create=403, update=403, status=403, got read=${viewerReadInvoicesRes.status}, create=${viewerCreateInvoiceRes.status}, update=${viewerUpdateInvoiceRes.status}, status=${viewerStatusInvoiceRes.status}`
+    );
+
+    // TEST 95: Regression check: Existing Sales and Inventory modules remain 100% operational
+    const salesHealthRes = await makeRequest(port, 'GET', '/api/sales', undefined, adminToken);
+    const inventoryHealthRes = await makeRequest(port, 'GET', '/api/inventory', undefined, adminToken);
+    const productsHealthRes = await makeRequest(port, 'GET', '/api/products', undefined, adminToken);
+    assert(
+      salesHealthRes.status === 200 &&
+        inventoryHealthRes.status === 200 &&
+        productsHealthRes.status === 200,
+      'TEST 95: Regression check: Existing Sales, Inventory, and Product modules remain 100% operational',
+      `Expected status 200 across existing modules, got sales=${salesHealthRes.status}, inv=${inventoryHealthRes.status}, prod=${productsHealthRes.status}`
+    );
+
   } finally {
     server.close();
   }
