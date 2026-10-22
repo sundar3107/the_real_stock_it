@@ -8,7 +8,7 @@ COPY package*.json ./
 RUN npm install
 
 # Copy source code and config
-COPY tsconfig.json tsconfig.app.json tsconfig.node.json vite.config.ts index.html postcss.config.js tailwind.config.js ./
+COPY tsconfig.json tsconfig.node.json vite.config.ts index.html postcss.config.js tailwind.config.js ./
 COPY src/ ./src/
 COPY public/ ./public/
 
