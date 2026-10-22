@@ -44,25 +44,9 @@ pipeline {
             }
         }
 
-        stage('Automated Tests & Quality Gate') {
-            steps {
-                echo '=== Stage 3: Running Automated Verification Tests (Modules 1-4) ==='
-                dir('backend') {
-                    script {
-                        // Runs 48 automated test scenarios
-                        if (isUnix()) {
-                            sh 'npm test'
-                        } else {
-                            bat 'npm test'
-                        }
-                    }
-                }
-            }
-        }
-
         stage('Build & Compilation') {
             steps {
-                echo '=== Stage 4: Compiling Backend (tsc) and Frontend (Vite) ==='
+                echo '=== Stage 3: Compiling Backend (tsc) and Frontend (Vite) ==='
                 dir('backend') {
                     script {
                         if (isUnix()) {
@@ -84,6 +68,22 @@ pipeline {
             }
         }
 
+        stage('Automated Tests & Quality Gate') {
+            steps {
+                echo '=== Stage 4: Running Automated Verification Tests (Modules 1-9) ==='
+                dir('backend') {
+                    script {
+                        // Executes all 104 automated test scenarios
+                        if (isUnix()) {
+                            sh 'npm test'
+                        } else {
+                            bat 'npm test'
+                        }
+                    }
+                }
+            }
+        }
+
         stage('Archive Artifacts') {
             steps {
                 echo '=== Stage 5: Archiving Production Build Artifacts ==='
@@ -95,7 +95,7 @@ pipeline {
     post {
         success {
             echo '====================================================='
-            echo ' Jenkins CI Pipeline PASSED: All 48 tests verified!  '
+            echo ' Jenkins CI Pipeline PASSED: All 104 tests verified! '
             echo ' SCM Release baseline ready for deployment.          '
             echo '====================================================='
         }
