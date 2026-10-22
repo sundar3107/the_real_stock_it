@@ -87,6 +87,67 @@ export function runMigrations() {
     console.log('[DB] Default categories seeded.');
   }
 
+  // 3b. Seed default products if none exist
+  const countProdStmt = db.prepare('SELECT COUNT(*) as count FROM products');
+  const prodResult = countProdStmt.get();
+  const prodCount = prodResult ? prodResult.count : 0;
+
+  if (prodCount === 0) {
+    console.log('[DB] No products found. Seeding standard products...');
+    const defaultProducts = [
+      {
+        id: 'prod_seed_001',
+        name: 'Wireless Ergonomic Mouse',
+        sku: 'SEED-ELEC-001',
+        category_id: 'cat_electronics',
+        description: '2.4GHz wireless optical mouse with USB receiver',
+        unit: 'pcs',
+        purchase_price: 15.0,
+        selling_price: 29.99,
+        opening_stock: 50,
+        current_stock: 50,
+        reorder_level: 10,
+        status: 'ACTIVE',
+      },
+      {
+        id: 'prod_seed_002',
+        name: 'A4 Premium Copy Paper 500 Sheets',
+        sku: 'SEED-OFFICE-001',
+        category_id: 'cat_office',
+        description: '75 GSM multipurpose white copy paper ream',
+        unit: 'ream',
+        purchase_price: 3.5,
+        selling_price: 6.99,
+        opening_stock: 100,
+        current_stock: 100,
+        reorder_level: 20,
+        status: 'ACTIVE',
+      },
+    ];
+
+    const insertProdStmt = db.prepare(`
+      INSERT INTO products (
+        id, name, sku, category_id, description, unit,
+        purchase_price, selling_price, opening_stock, current_stock,
+        reorder_level, status, created_at, updated_at
+      ) VALUES (
+        ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?,
+        ?, ?, datetime('now'), datetime('now')
+      )
+      ON CONFLICT(sku) DO NOTHING
+    `);
+
+    for (const p of defaultProducts) {
+      insertProdStmt.run(
+        p.id, p.name, p.sku, p.category_id, p.description, p.unit,
+        p.purchase_price, p.selling_price, p.opening_stock, p.current_stock,
+        p.reorder_level, p.status
+      );
+    }
+    console.log('[DB] Standard products seeded.');
+  }
+
   // 4. Initialize inventory records for products that do not have an inventory record
   const syncInventoryStmt = db.prepare(`
     INSERT INTO inventory (id, product_id, current_quantity, created_at, updated_at)
