@@ -53,7 +53,7 @@ export class CustomerController {
 
   static create(req: Request, res: Response, next: NextFunction): void {
     try {
-      const customer = CustomerService.createCustomer(req.body);
+      const customer = CustomerService.createCustomer(req.body, req.user?.userId);
       res.status(201).json({
         success: true,
         message: 'Customer registered successfully.',
@@ -67,7 +67,7 @@ export class CustomerController {
   static update(req: Request, res: Response, next: NextFunction): void {
     try {
       const customerId = req.params.id as string;
-      const customer = CustomerService.updateCustomer(customerId, req.body);
+      const customer = CustomerService.updateCustomer(customerId, req.body, req.user?.userId);
       res.status(200).json({
         success: true,
         message: 'Customer updated successfully.',

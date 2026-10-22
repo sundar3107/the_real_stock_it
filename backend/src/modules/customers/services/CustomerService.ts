@@ -1,4 +1,5 @@
 import { AppError } from '../../authentication/services/AuthService';
+import { AuditService } from '../../audit/services/AuditService';
 import { CustomerModel } from '../models/Customer';
 import {
   ICustomer,
@@ -30,7 +31,7 @@ export class CustomerService {
     };
   }
 
-  static createCustomer(data: ICustomerFormData): ICustomer {
+  static createCustomer(data: ICustomerFormData, userId?: string): ICustomer {
     // If only company name was provided, populate customer_name
     if ((!data.customer_name || !data.customer_name.trim()) && data.company_name && data.company_name.trim()) {
       data.customer_name = data.company_name.trim();
@@ -49,10 +50,20 @@ export class CustomerService {
       });
     }
 
-    return CustomerModel.create(data);
+    const created = CustomerModel.create(data);
+    AuditService.recordActivity({
+      user_id: userId,
+      action: 'CREATE',
+      module: 'CUSTOMER',
+      entity_type: 'CUSTOMER',
+      entity_id: created.id,
+      description: `Created customer "${created.customer_name}" (${created.email})`,
+      new_value: { customer_name: created.customer_name, email: created.email, phone: created.phone, status: created.status },
+    });
+    return created;
   }
 
-  static updateCustomer(id: string, data: Partial<ICustomerFormData>): ICustomer {
+  static updateCustomer(id: string, data: Partial<ICustomerFormData>, userId?: string): ICustomer {
     const existing = CustomerModel.findById(id);
     if (!existing) {
       throw new AppError(`Customer with ID '${id}' not found.`, 404);
@@ -74,6 +85,18 @@ export class CustomerService {
     }
 
     const updated = CustomerModel.update(id, data);
+    if (updated) {
+      AuditService.recordActivity({
+        user_id: userId,
+        action: 'UPDATE',
+        module: 'CUSTOMER',
+        entity_type: 'CUSTOMER',
+        entity_id: updated.id,
+        description: `Updated customer "${updated.customer_name}"`,
+        old_value: { customer_name: existing.customer_name, status: existing.status },
+        new_value: { customer_name: updated.customer_name, status: updated.status },
+      });
+    }
     if (!updated) {
       throw new AppError(`Failed to update customer with ID '${id}'.`, 500);
     }

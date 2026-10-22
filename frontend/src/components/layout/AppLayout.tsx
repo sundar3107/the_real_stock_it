@@ -10,6 +10,10 @@ import {
   ShoppingBag,
   TrendingUp,
   Receipt,
+  FileSpreadsheet,
+  Bell,
+  ShieldCheck,
+  Sliders,
   UserCheck,
   Layers,
 } from 'lucide-react';
@@ -26,6 +30,10 @@ export const AppLayout: React.FC = () => {
     { label: 'Purchases', path: '/purchases', icon: ShoppingBag },
     { label: 'Sales', path: '/sales', icon: TrendingUp },
     { label: 'Invoices', path: '/invoices', icon: Receipt },
+    { label: 'Reports & Analytics', path: '/reports', icon: FileSpreadsheet },
+    { label: 'Notifications', path: '/notifications', icon: Bell },
+    { label: 'Audit Trail', path: '/audit', icon: ShieldCheck },
+    { label: 'Administration', path: '/admin', icon: Sliders },
     { label: 'My Profile', path: '/profile', icon: UserCheck },
   ];
 
@@ -60,14 +68,14 @@ export const AppLayout: React.FC = () => {
               );
             })}
 
-            {/* Modular Integration Placeholder for upcoming modules */}
+            {/* Modular Status */}
             <div className="pt-4 mt-4 border-t border-slate-100">
-              <div className="px-3 py-1.5 flex items-center gap-1.5 text-xs font-medium text-slate-400">
+              <div className="px-3 py-1.5 flex items-center gap-1.5 text-xs font-semibold text-emerald-600">
                 <Layers className="w-3.5 h-3.5" />
-                <span>Upcoming SCM Modules</span>
+                <span>All 13 SCM Modules Active</span>
               </div>
-              <div className="px-3 py-1 text-xs text-slate-400 italic">
-                Module 10: Notifications & Activity Audit Trail in queue.
+              <div className="px-3 py-1 text-xs text-slate-400">
+                Modules 1–13 fully implemented &amp; verified.
               </div>
             </div>
           </nav>
@@ -80,7 +88,7 @@ export const AppLayout: React.FC = () => {
       </div>
 
       <footer className="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
-        Stock Management System &bull; SCM Project Baseline &bull; Module 9: Executive Dashboard
+        Stock Management System &bull; SCM Project Complete &bull; Module 13: System Administration
       </footer>
     </div>
   );

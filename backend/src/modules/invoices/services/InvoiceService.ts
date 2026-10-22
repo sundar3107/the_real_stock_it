@@ -1,4 +1,5 @@
 import { AppError } from '../../authentication/services/AuthService';
+import { AuditService } from '../../audit/services/AuditService';
 import { InvoiceModel } from '../models/Invoice';
 import { InvoiceItemModel } from '../models/InvoiceItem';
 import { CustomerModel } from '../../customers/models/Customer';
@@ -254,6 +255,15 @@ export class InvoiceService {
       });
     }
 
+    AuditService.recordActivity({
+      user_id: userId,
+      action: 'CREATE',
+      module: 'INVOICE',
+      entity_type: 'INVOICE',
+      entity_id: createdInvoice.id,
+      description: `Created invoice #${createdInvoice.invoice_number} for customer ${customer.customer_name} (Total: ${total})`,
+      new_value: { invoice_number: createdInvoice.invoice_number, customer_id: workingDto.customer_id, total, status },
+    });
     return this.getInvoiceById(createdInvoice.id);
   }
 
@@ -348,7 +358,7 @@ export class InvoiceService {
   /**
    * Update invoice workflow status with transition validation.
    */
-  static updateStatus(id: string, newStatus: InvoiceStatus): IInvoiceDetail {
+  static updateStatus(id: string, newStatus: InvoiceStatus, userId?: string): IInvoiceDetail {
     const existing = InvoiceModel.findById(id);
     if (!existing) {
       throw new AppError(`Invoice with ID '${id}' not found.`, 404);
@@ -356,6 +366,17 @@ export class InvoiceService {
 
     validateStatusTransition(existing.status, newStatus);
     InvoiceModel.updateStatus(existing.id, newStatus);
+
+    AuditService.recordActivity({
+      user_id: userId,
+      action: 'STATUS_CHANGE',
+      module: 'INVOICE',
+      entity_type: 'INVOICE',
+      entity_id: existing.id,
+      description: `Invoice #${existing.invoice_number} status changed: ${existing.status} -> ${newStatus}`,
+      old_value: { status: existing.status },
+      new_value: { status: newStatus },
+    });
 
     return this.getInvoiceById(existing.id);
   }

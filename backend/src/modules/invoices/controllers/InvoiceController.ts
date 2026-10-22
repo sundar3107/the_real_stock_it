@@ -98,7 +98,8 @@ export class InvoiceController {
     try {
       const id = req.params.id as string;
       const { status } = req.body;
-      const updated = InvoiceService.updateStatus(id, status);
+      const userId = (req as any).user?.userId;
+      const updated = InvoiceService.updateStatus(id, status, userId);
       res.status(200).json({
         success: true,
         message: `Invoice #${updated.invoice_number} status changed to '${status}'.`,

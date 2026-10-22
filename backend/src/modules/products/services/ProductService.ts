@@ -1,8 +1,9 @@
-﻿import crypto from 'crypto';
+import crypto from 'crypto';
 import { ProductModel } from '../models/Product';
 import { CategoryModel } from '../models/Category';
 import { ProductValidator } from '../validators/productValidators';
 import { AppError } from '../../authentication/services/AuthService';
+import { AuditService } from '../../audit/services/AuditService';
 import {
   ICreateProductDto,
   IProduct,
@@ -33,7 +34,7 @@ export class ProductService {
   /**
    * Create a new product in the catalog
    */
-  static createProduct(data: ICreateProductDto): IProduct {
+  static createProduct(data: ICreateProductDto, userId?: string): IProduct {
     const validation = ProductValidator.validateCreate(data);
     if (!validation.isValid) {
       throw new AppError('Product validation failed', 400, validation.errors);
@@ -62,7 +63,7 @@ export class ProductService {
 
     const productId = `prd_${crypto.randomBytes(6).toString('hex')}`;
 
-    return ProductModel.create({
+    const product = ProductModel.create({
       id: productId,
       name: data.name,
       sku: data.sku,
@@ -76,6 +77,24 @@ export class ProductService {
       reorder_level: reorderLevel,
       status: data.status || 'ACTIVE',
     });
+
+    AuditService.recordActivity({
+      user_id: userId,
+      action: 'CREATE',
+      module: 'PRODUCT',
+      entity_type: 'PRODUCT',
+      entity_id: product.id,
+      description: `Created product "${product.name}" (SKU: ${product.sku})`,
+      new_value: {
+        name: product.name,
+        sku: product.sku,
+        selling_price: product.selling_price,
+        current_stock: product.current_stock,
+      },
+    });
+
+    return product;
+
   }
 
   /**
@@ -83,7 +102,7 @@ export class ProductService {
    * NOTE: Does not manipulate inventory balances directly, maintaining low coupling
    * with the future Inventory management module.
    */
-  static updateProduct(id: string, data: IUpdateProductDto): IProduct {
+  static updateProduct(id: string, data: IUpdateProductDto, userId?: string): IProduct {
     const validation = ProductValidator.validateUpdate(data);
     if (!validation.isValid) {
       throw new AppError('Product update validation failed', 400, validation.errors);
@@ -118,13 +137,24 @@ export class ProductService {
     if (!updated) {
       throw new AppError('Failed to update product', 500);
     }
+    AuditService.recordActivity({
+      user_id: userId,
+      action: 'UPDATE',
+      module: 'PRODUCT',
+      entity_type: 'PRODUCT',
+      entity_id: updated.id,
+      description: `Updated product "${updated.name}" (SKU: ${updated.sku})`,
+      old_value: { name: existing.name, sku: existing.sku, purchase_price: existing.purchase_price, selling_price: existing.selling_price, status: existing.status },
+      new_value: { name: updated.name, sku: updated.sku, purchase_price: updated.purchase_price, selling_price: updated.selling_price, status: updated.status },
+    });
+
     return updated;
   }
 
   /**
    * Soft-deactivate product to preserve historical transaction relationships.
    */
-  static deactivateProduct(id: string): IProduct {
+  static deactivateProduct(id: string, userId?: string): IProduct {
     const existing = ProductModel.findById(id);
     if (!existing) {
       throw new AppError(`Product with ID '${id}' not found`, 404);
@@ -134,6 +164,17 @@ export class ProductService {
     if (!deactivated) {
       throw new AppError('Failed to deactivate product', 500);
     }
+    AuditService.recordActivity({
+      user_id: userId,
+      action: 'DEACTIVATE',
+      module: 'PRODUCT',
+      entity_type: 'PRODUCT',
+      entity_id: deactivated.id,
+      description: `Deactivated product "${deactivated.name}" (SKU: ${deactivated.sku})`,
+      old_value: { status: existing.status },
+      new_value: { status: 'INACTIVE' },
+    });
+
     return deactivated;
   }
 }

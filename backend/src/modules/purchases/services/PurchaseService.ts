@@ -1,4 +1,5 @@
 import { AppError } from '../../authentication/services/AuthService';
+import { AuditService } from '../../audit/services/AuditService';
 import { PurchaseOrderModel } from '../models/PurchaseOrder';
 import { PurchaseOrderItemModel } from '../models/PurchaseOrderItem';
 import { SupplierModel } from '../../suppliers/models/Supplier';
@@ -125,6 +126,16 @@ export class PurchaseService {
       });
     }
 
+    AuditService.recordActivity({
+      user_id: userId,
+      action: 'CREATE',
+      module: 'PURCHASE',
+      entity_type: 'PURCHASE_ORDER',
+      entity_id: createdPO.id,
+      description: `Created purchase order PO #${createdPO.id} for supplier "${supplier.supplier_name}" (Total: $${total})`,
+      new_value: { supplier_id: data.supplier_id, total, status, items_count: computedItems.length },
+    });
+
     return this.getPurchaseById(createdPO.id);
   }
 
@@ -206,7 +217,7 @@ export class PurchaseService {
     return this.getPurchaseById(id);
   }
 
-  static updateStatus(id: string, newStatus: PurchaseStatus): IPurchaseOrderDetail {
+  static updateStatus(id: string, newStatus: PurchaseStatus, userId?: string): IPurchaseOrderDetail {
     const existing = PurchaseOrderModel.findById(id);
     if (!existing) {
       throw new AppError(`Purchase order with ID '${id}' not found.`, 404);
@@ -221,6 +232,16 @@ export class PurchaseService {
     }
 
     PurchaseOrderModel.updateStatus(id, newStatus);
+    AuditService.recordActivity({
+      user_id: userId,
+      action: 'STATUS_CHANGE',
+      module: 'PURCHASE',
+      entity_type: 'PURCHASE_ORDER',
+      entity_id: id,
+      description: `Purchase order PO #${id} status changed: ${existing.status} -> ${newStatus}`,
+      old_value: { status: existing.status },
+      new_value: { status: newStatus },
+    });
     return this.getPurchaseById(id);
   }
 
@@ -310,7 +331,16 @@ export class PurchaseService {
       : po.status;
 
     PurchaseOrderModel.updateStatus(id, nextStatus);
-
+    AuditService.recordActivity({
+      user_id: userId,
+      action: 'RECEIVE',
+      module: 'PURCHASE',
+      entity_type: 'PURCHASE_ORDER',
+      entity_id: id,
+      description: `Received ${totalReceivedThisBatch} items for PO #${id}. New status: ${nextStatus}`,
+      old_value: { status: po.status },
+      new_value: { status: nextStatus, received_count: totalReceivedThisBatch },
+    });
     return {
       purchase_order: this.getPurchaseById(id),
       received_count: totalReceivedThisBatch,

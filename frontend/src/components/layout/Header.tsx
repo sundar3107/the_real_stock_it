@@ -1,8 +1,9 @@
-﻿import React from 'react';
+import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../modules/authentication/hooks/useAuth';
 import { Button } from '../common/Button';
-import { Package, User, LogOut } from 'lucide-react';
+import { Package, LogOut } from 'lucide-react';
+import { NotificationDropdown } from '../../modules/notifications/components/NotificationDropdown';
 
 export const Header: React.FC = () => {
   const { user, logout, isLoading } = useAuth();
@@ -30,12 +31,17 @@ export const Header: React.FC = () => {
             </div>
           </Link>
 
-          {/* User Profile & Actions */}
+          {/* User Profile, Notifications & Actions */}
           {user && (
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 sm:gap-4">
+              {/* Notification Indicator Bell */}
+              <NotificationDropdown />
+
+              <div className="h-6 w-px bg-slate-200" />
+
               <Link
                 to="/profile"
-                className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition text-slate-700"
+                className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 transition text-slate-700"
               >
                 <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs uppercase">
                   {user.full_name.charAt(0)}

@@ -1,9 +1,10 @@
-﻿import crypto from 'crypto';
+import crypto from 'crypto';
 import { UserModel } from '../models/User';
 import { RoleModel } from '../models/Role';
 import { AuthValidator } from '../validators/authValidators';
 import { hashPassword, comparePassword } from '../../../utils/passwordUtils';
 import { generateToken } from '../../../utils/tokenUtils';
+import { AuditService } from '../../audit/services/AuditService';
 import {
   IAuthResponse,
   ILoginRequest,
@@ -56,6 +57,16 @@ export class AuthService {
     // Retrieve role information
     const role = RoleModel.findById(user.role_id);
     const roleName: UserRole = (role ? role.name : 'VIEWER') as UserRole;
+
+    AuditService.recordActivity({
+      user_id: user.id,
+      action: 'LOGIN',
+      module: 'AUTH',
+      entity_type: 'USER',
+      entity_id: user.id,
+      description: `User ${user.email} successfully logged in`,
+      metadata: { email: user.email, role: roleName },
+    });
 
     // Issue JWT token
     const token = generateToken({
@@ -111,6 +122,17 @@ export class AuthService {
       password_hash,
       role_id: role.id,
       status: 'ACTIVE',
+    });
+
+    // Record audit log for registration
+    AuditService.recordActivity({
+      user_id: newUser.id,
+      action: 'REGISTER',
+      module: 'AUTH',
+      entity_type: 'USER',
+      entity_id: newUser.id,
+      description: `New user registered: ${newUser.email}`,
+      new_value: { email: newUser.email, full_name: newUser.full_name, role: role.name },
     });
 
     // Issue initial JWT token

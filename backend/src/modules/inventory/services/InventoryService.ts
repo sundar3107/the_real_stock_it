@@ -1,10 +1,11 @@
-﻿import crypto from 'crypto';
+import crypto from 'crypto';
 import { db } from '../../../database/connection';
 import { InventoryModel } from '../models/Inventory';
 import { StockTransactionModel } from '../models/StockTransaction';
 import { ProductModel } from '../../products/models/Product';
 import { InventoryValidator } from '../validators/inventoryValidators';
 import { AppError } from '../../authentication/services/AuthService';
+import { AuditService } from '../../audit/services/AuditService';
 import {
   IInventoryFilterQuery,
   IInventoryItem,
@@ -90,7 +91,19 @@ export class InventoryService {
       }
     };
 
-    return executeStockIn();
+    const result = executeStockIn();
+    AuditService.recordActivity({
+      user_id: userId,
+      action: 'STOCK_IN',
+      module: 'INVENTORY',
+      entity_type: 'PRODUCT',
+      entity_id: dto.product_id,
+      description: `Stock IN: added ${addQuantity} units to "${product.name}" (${previousQuantity} -> ${newQuantity})`,
+      old_value: { current_quantity: previousQuantity },
+      new_value: { current_quantity: newQuantity, added: addQuantity },
+      metadata: { reason, reference: dto.reference || null, transaction_id: transactionId },
+    });
+    return result;
   }
 
   /**
@@ -156,7 +169,19 @@ export class InventoryService {
       }
     };
 
-    return executeStockOut();
+    const result = executeStockOut();
+    AuditService.recordActivity({
+      user_id: userId,
+      action: 'STOCK_OUT',
+      module: 'INVENTORY',
+      entity_type: 'PRODUCT',
+      entity_id: dto.product_id,
+      description: `Stock OUT: deducted ${deductQuantity} units from "${product.name}" (${previousQuantity} -> ${newQuantity})`,
+      old_value: { current_quantity: previousQuantity },
+      new_value: { current_quantity: newQuantity, deducted: deductQuantity },
+      metadata: { reason, reference: dto.reference || null, transaction_id: transactionId },
+    });
+    return result;
   }
 
   /**
@@ -228,7 +253,19 @@ export class InventoryService {
       }
     };
 
-    return executeAdjustment();
+    const result = executeAdjustment();
+    AuditService.recordActivity({
+      user_id: userId,
+      action: 'STOCK_ADJUSTMENT',
+      module: 'INVENTORY',
+      entity_type: 'PRODUCT',
+      entity_id: dto.product_id,
+      description: `Stock Adjustment (${dto.adjustment_type}): adjusted "${product.name}" from ${previousQuantity} to ${newQuantity}`,
+      old_value: { current_quantity: previousQuantity },
+      new_value: { current_quantity: newQuantity, delta: deltaQuantity, adjustment_type: dto.adjustment_type },
+      metadata: { reason: dto.reason, reference: dto.reference || null, transaction_id: transactionId },
+    });
+    return result;
   }
 
   /**

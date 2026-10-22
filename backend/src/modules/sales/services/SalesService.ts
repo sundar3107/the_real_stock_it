@@ -1,4 +1,5 @@
 import { AppError } from '../../authentication/services/AuthService';
+import { AuditService } from '../../audit/services/AuditService';
 import { SalesOrderModel } from '../models/SalesOrder';
 import { SalesOrderItemModel } from '../models/SalesOrderItem';
 import { CustomerModel } from '../../customers/models/Customer';
@@ -130,6 +131,15 @@ export class SalesService {
       return this.completeSale(createdSO.id, userId);
     }
 
+    AuditService.recordActivity({
+      user_id: userId,
+      action: 'CREATE',
+      module: 'SALES',
+      entity_type: 'SALES_ORDER',
+      entity_id: createdSO.id,
+      description: `Created sales order ${createdSO.order_number} for customer ${customer.customer_name} (Total: ${total})`,
+      new_value: { customer_id: data.customer_id, order_number: createdSO.order_number, total, status: initialStatus, items_count: computedItems.length },
+    });
     return this.getSaleById(createdSO.id);
   }
 
@@ -301,6 +311,17 @@ export class SalesService {
 
     // 3. Mark sales order status as COMPLETED
     SalesOrderModel.updateStatus(order.id, 'COMPLETED');
+
+    AuditService.recordActivity({
+      user_id: userId,
+      action: 'STATUS_CHANGE',
+      module: 'SALES',
+      entity_type: 'SALES_ORDER',
+      entity_id: order.id,
+      description: `Completed sales order ${order.order_number}. Inventory stock deducted for ${items.length} line items.`,
+      old_value: { status: order.status },
+      new_value: { status: 'COMPLETED' },
+    });
 
     return this.getSaleById(order.id);
   }

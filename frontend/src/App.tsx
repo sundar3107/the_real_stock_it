@@ -14,6 +14,10 @@ import { CustomersPage } from './modules/customers/pages/CustomersPage';
 import { PurchasesPage } from './modules/purchases/pages/PurchasesPage';
 import { SalesPage } from './modules/sales/pages/SalesPage';
 import { InvoicesPage } from './modules/invoices/pages/InvoicesPage';
+import { ReportsPage } from './modules/reports/pages/ReportsPage';
+import { NotificationsPage } from './modules/notifications/pages/NotificationsPage';
+import { AuditLogsPage } from './modules/audit/pages/AuditLogsPage';
+import { AdministrationPage } from './modules/administration/pages/AdministrationPage';
 
 export const App: React.FC = () => {
   return (
@@ -40,6 +44,10 @@ export const App: React.FC = () => {
             <Route path="/purchases" element={<PurchasesPage />} />
             <Route path="/sales" element={<SalesPage />} />
             <Route path="/invoices" element={<InvoicesPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
+            <Route path="/audit" element={<AuditLogsPage />} />
+            <Route path="/admin" element={<AdministrationPage />} />
             <Route path="/profile" element={<ProfilePage />} />
           </Route>
 

@@ -53,7 +53,7 @@ export class SupplierController {
 
   static create(req: Request, res: Response, next: NextFunction): void {
     try {
-      const supplier = SupplierService.createSupplier(req.body);
+      const supplier = SupplierService.createSupplier(req.body, req.user?.userId);
       res.status(201).json({
         success: true,
         message: 'Supplier registered successfully.',
@@ -67,7 +67,7 @@ export class SupplierController {
   static update(req: Request, res: Response, next: NextFunction): void {
     try {
       const supplierId = req.params.id as string;
-      const supplier = SupplierService.updateSupplier(supplierId, req.body);
+      const supplier = SupplierService.updateSupplier(supplierId, req.body, req.user?.userId);
       res.status(200).json({
         success: true,
         message: 'Supplier updated successfully.',

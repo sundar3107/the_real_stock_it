@@ -296,3 +296,67 @@ CREATE INDEX IF NOT EXISTS idx_invi_invoice_id ON invoice_items(invoice_id);
 CREATE INDEX IF NOT EXISTS idx_invi_product_id ON invoice_items(product_id);
 
 
+
+
+-- 16. Notifications (Module 11)
+CREATE TABLE IF NOT EXISTS notifications (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    type TEXT NOT NULL, -- 'LOW_STOCK', 'OUT_OF_STOCK', 'PURCHASE_ORDER', 'SALES_ORDER', 'INVOICE', 'SYSTEM'
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    reference_type TEXT, -- 'PRODUCT', 'PURCHASE_ORDER', 'SALES_ORDER', 'INVOICE'
+    reference_id TEXT,
+    is_read INTEGER NOT NULL DEFAULT 0 CHECK(is_read IN (0, 1)),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+-- Indexes for Notifications
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
+CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at);
+CREATE INDEX IF NOT EXISTS idx_notifications_ref ON notifications(reference_type, reference_id);
+
+
+-- 17. Activity / Audit Logs (Module 12)
+CREATE TABLE IF NOT EXISTS activity_logs (
+    id TEXT PRIMARY KEY,
+    user_id TEXT,
+    action TEXT NOT NULL,
+    module TEXT NOT NULL,
+    entity_type TEXT,
+    entity_id TEXT,
+    description TEXT NOT NULL,
+    old_value TEXT,
+    new_value TEXT,
+    metadata TEXT,
+    timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE SET NULL
+);
+
+-- Indexes for Activity / Audit Logs
+CREATE INDEX IF NOT EXISTS idx_activity_logs_user_id ON activity_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_action ON activity_logs(action);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_module ON activity_logs(module);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_entity ON activity_logs(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_timestamp ON activity_logs(timestamp);
+
+
+-- 18. System Settings (Module 13: System Administration)
+CREATE TABLE IF NOT EXISTS system_settings (
+    id TEXT PRIMARY KEY,
+    setting_key TEXT UNIQUE NOT NULL COLLATE NOCASE,
+    setting_value TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT 'GENERAL',
+    description TEXT,
+    updated_by TEXT,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (updated_by) REFERENCES users(id) ON UPDATE CASCADE ON DELETE SET NULL
+);
+
+-- Indexes for System Settings
+CREATE INDEX IF NOT EXISTS idx_system_settings_key ON system_settings(setting_key);
+CREATE INDEX IF NOT EXISTS idx_system_settings_category ON system_settings(category);
+

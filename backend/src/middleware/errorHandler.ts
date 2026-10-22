@@ -1,4 +1,4 @@
-﻿import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../modules/authentication/services/AuthService';
 
 /**
@@ -16,7 +16,7 @@ export function errorHandler(
   }
 
   // Handle custom application errors with explicit status codes
-  if (err instanceof AppError) {
+  if (err instanceof AppError || (err && typeof err.statusCode === 'number')) {
     res.status(err.statusCode).json({
       success: false,
       message: err.message,

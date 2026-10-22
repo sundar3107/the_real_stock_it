@@ -1,4 +1,5 @@
 import { AppError } from '../../authentication/services/AuthService';
+import { AuditService } from '../../audit/services/AuditService';
 import { SupplierModel } from '../models/Supplier';
 import { SupplierProductModel } from '../models/SupplierProduct';
 import { ProductModel } from '../../products/models/Product';
@@ -33,7 +34,7 @@ export class SupplierService {
     };
   }
 
-  static createSupplier(data: ISupplierFormData): ISupplier {
+  static createSupplier(data: ISupplierFormData, userId?: string): ISupplier {
     const validation = validateSupplierData(data, false);
     if (!validation.isValid) {
       throw new AppError('Validation failed for supplier creation.', 400, validation.errors);
@@ -47,10 +48,20 @@ export class SupplierService {
       });
     }
 
-    return SupplierModel.create(data);
+    const created = SupplierModel.create(data);
+    AuditService.recordActivity({
+      user_id: userId,
+      action: 'CREATE',
+      module: 'SUPPLIER',
+      entity_type: 'SUPPLIER',
+      entity_id: created.id,
+      description: `Created supplier "${created.supplier_name}" (${created.email})`,
+      new_value: { supplier_name: created.supplier_name, email: created.email, phone: created.phone, status: created.status },
+    });
+    return created;
   }
 
-  static updateSupplier(id: string, data: Partial<ISupplierFormData>): ISupplier {
+  static updateSupplier(id: string, data: Partial<ISupplierFormData>, userId?: string): ISupplier {
     const existing = SupplierModel.findById(id);
     if (!existing) {
       throw new AppError(`Supplier with ID '${id}' not found.`, 404);
@@ -72,6 +83,18 @@ export class SupplierService {
     }
 
     const updated = SupplierModel.update(id, data);
+    if (updated) {
+      AuditService.recordActivity({
+        user_id: userId,
+        action: 'UPDATE',
+        module: 'SUPPLIER',
+        entity_type: 'SUPPLIER',
+        entity_id: updated.id,
+        description: `Updated supplier "${updated.supplier_name}"`,
+        old_value: { supplier_name: existing.supplier_name, status: existing.status },
+        new_value: { supplier_name: updated.supplier_name, status: updated.status },
+      });
+    }
     if (!updated) {
       throw new AppError(`Failed to update supplier with ID '${id}'.`, 500);
     }

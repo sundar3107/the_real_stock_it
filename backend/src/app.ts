@@ -11,6 +11,10 @@ import purchaseRoutes from './modules/purchases/routes/purchaseRoutes';
 import salesRoutes from './modules/sales/routes/salesRoutes';
 import invoiceRoutes from './modules/invoices/routes/invoiceRoutes';
 import dashboardRoutes from './modules/dashboard/routes/dashboardRoutes';
+import reportRoutes from './modules/reports/routes/reportRoutes';
+import notificationRoutes from './modules/notifications/routes/notificationRoutes';
+import auditRoutes from './modules/audit/routes/auditRoutes';
+import administrationRoutes from './modules/administration/routes/administrationRoutes';
 import { errorHandler } from './middleware/errorHandler';
 
 export function createApp(): Application {
@@ -30,7 +34,7 @@ export function createApp(): Application {
       status: 'OK',
       timestamp: new Date().toISOString(),
       service: 'Stock Management System API',
-      module: 'Module 1: Auth, Module 2: Products, Module 3: Inventory, Module 4: Suppliers, Module 5: Customers, Module 6: Purchases, Module 7: Sales, Module 8: Invoices, Module 9: Dashboard',
+      module: 'Module 1: Auth, Module 2: Products, Module 3: Inventory, Module 4: Suppliers, Module 5: Customers, Module 6: Purchases, Module 7: Sales, Module 8: Invoices, Module 9: Dashboard, Module 10: Reports, Module 11: Notifications, Module 12: Audit, Module 13: Administration',
     });
   });
 
@@ -45,6 +49,10 @@ export function createApp(): Application {
   app.use('/api/sales', salesRoutes);
   app.use('/api/invoices', invoiceRoutes);
   app.use('/api/dashboard', dashboardRoutes);
+  app.use('/api/reports', reportRoutes);
+  app.use('/api/notifications', notificationRoutes);
+  app.use('/api/audit', auditRoutes);
+  app.use('/api/admin', administrationRoutes);
 
   // Catch-all 404 handler for unrecognized routes
   app.use((req: Request, res: Response) => {

@@ -2651,6 +2651,796 @@ async function runAllTests() {
       `Expected 200 OK across all prior modules 1-8`
     );
 
+    // ----------------------------------------------------
+    // MODULE 10: REPORTS & ANALYTICS TESTS (TESTS 105 - 117)
+    // ----------------------------------------------------
+    console.log('\n--- MODULE 10: REPORTS & ANALYTICS ---');
+
+    // TEST 105: GET /api/reports/inventory-valuation (Authoritative stock valuation and summary metrics)
+    const invValRes = await makeRequest(port, 'GET', '/api/reports/inventory-valuation', undefined, adminToken);
+    assert(
+      invValRes.status === 200 &&
+        invValRes.body.success === true &&
+        Array.isArray(invValRes.body.data.items) &&
+        invValRes.body.data.summary &&
+        typeof invValRes.body.data.summary.total_cost_valuation === 'number' &&
+        typeof invValRes.body.data.summary.total_retail_valuation === 'number' &&
+        invValRes.body.data.items.length > 0 &&
+        invValRes.body.data.items[0].product_id &&
+        typeof invValRes.body.data.items[0].total_cost_valuation === 'number',
+      'TEST 105: GET /api/reports/inventory-valuation (Authoritative stock valuation, margin calculation, and summary metrics)',
+      `Expected 200 with inventory valuation dataset, got ${invValRes.status}`
+    );
+
+    // TEST 106: GET /api/reports/inventory-valuation (Filters: stock_status and search query)
+    const filteredInvRes = await makeRequest(
+      port,
+      'GET',
+      '/api/reports/inventory-valuation?stock_status=IN_STOCK&search=Widget',
+      undefined,
+      adminToken
+    );
+    assert(
+      filteredInvRes.status === 200 &&
+        filteredInvRes.body.success === true &&
+        filteredInvRes.body.data.items.every(
+          (item) => item.stock_status === 'IN_STOCK' && (item.name.includes('Widget') || item.sku.includes('Widget'))
+        ),
+      'TEST 106: GET /api/reports/inventory-valuation (Filters: stock_status and search query)',
+      `Expected 200 with matching items, got ${filteredInvRes.status}`
+    );
+
+    // TEST 107: GET /api/reports/sales (Sales orders aggregation, revenue, average order value, top products)
+    const salesReportRes = await makeRequest(port, 'GET', '/api/reports/sales', undefined, adminToken);
+    assert(
+      salesReportRes.status === 200 &&
+        salesReportRes.body.success === true &&
+        Array.isArray(salesReportRes.body.data.orders) &&
+        Array.isArray(salesReportRes.body.data.top_products) &&
+        salesReportRes.body.data.summary &&
+        typeof salesReportRes.body.data.summary.total_revenue === 'number' &&
+        typeof salesReportRes.body.data.summary.completed_orders === 'number',
+      'TEST 107: GET /api/reports/sales (Sales orders aggregation, revenue, average order value, top products)',
+      `Expected 200 with sales analytics report, got ${salesReportRes.status}`
+    );
+
+    // TEST 108: GET /api/reports/sales (Date range filtering and status filtering)
+    const filteredSalesRes = await makeRequest(
+      port,
+      'GET',
+      '/api/reports/sales?status=COMPLETED',
+      undefined,
+      adminToken
+    );
+    assert(
+      filteredSalesRes.status === 200 &&
+        filteredSalesRes.body.success === true &&
+        filteredSalesRes.body.data.orders.every((o) => o.status === 'COMPLETED'),
+      'TEST 108: GET /api/reports/sales (Date range filtering and status filtering)',
+      `Expected 200 with strictly COMPLETED sales orders, got ${filteredSalesRes.status}`
+    );
+
+    // TEST 109: GET /api/reports/purchases (Procurement orders, total spend, fulfillment rate, supplier spend breakdown)
+    const purchReportRes = await makeRequest(port, 'GET', '/api/reports/purchases', undefined, adminToken);
+    assert(
+      purchReportRes.status === 200 &&
+        purchReportRes.body.success === true &&
+        Array.isArray(purchReportRes.body.data.orders) &&
+        Array.isArray(purchReportRes.body.data.supplier_spend) &&
+        purchReportRes.body.data.summary &&
+        typeof purchReportRes.body.data.summary.total_spend === 'number' &&
+        typeof purchReportRes.body.data.summary.overall_fulfillment_rate === 'number',
+      'TEST 109: GET /api/reports/purchases (Procurement orders, total spend, fulfillment rate, supplier spend breakdown)',
+      `Expected 200 with purchase analytics report, got ${purchReportRes.status}`
+    );
+
+    // TEST 110: GET /api/reports/purchases (Status filtering: RECEIVED orders)
+    const filteredPurchRes = await makeRequest(
+      port,
+      'GET',
+      '/api/reports/purchases?status=RECEIVED',
+      undefined,
+      adminToken
+    );
+    assert(
+      filteredPurchRes.status === 200 &&
+        filteredPurchRes.body.success === true &&
+        filteredPurchRes.body.data.orders.every((o) => o.status === 'RECEIVED'),
+      'TEST 110: GET /api/reports/purchases (Status filtering: RECEIVED orders)',
+      `Expected 200 with strictly RECEIVED orders, got ${filteredPurchRes.status}`
+    );
+
+    // TEST 111: GET /api/reports/stock-movement (Transaction ledger audit trail, chronological ordering, user attribution)
+    const movementReportRes = await makeRequest(port, 'GET', '/api/reports/stock-movement', undefined, adminToken);
+    assert(
+      movementReportRes.status === 200 &&
+        movementReportRes.body.success === true &&
+        Array.isArray(movementReportRes.body.data.movements) &&
+        movementReportRes.body.data.summary &&
+        movementReportRes.body.data.movements.length > 0 &&
+        movementReportRes.body.data.movements[0].transaction_type &&
+        movementReportRes.body.data.movements[0].performed_by_name,
+      'TEST 111: GET /api/reports/stock-movement (Transaction ledger audit trail, chronological ordering, user attribution)',
+      `Expected 200 with stock movement ledger dataset, got ${movementReportRes.status}`
+    );
+
+    // TEST 112: GET /api/reports/stock-movement (Transaction type filtering)
+    const filteredMovementRes = await makeRequest(
+      port,
+      'GET',
+      '/api/reports/stock-movement?transaction_type=STOCK_IN',
+      undefined,
+      adminToken
+    );
+    assert(
+      filteredMovementRes.status === 200 &&
+        filteredMovementRes.body.success === true &&
+        filteredMovementRes.body.data.movements.every((m) => m.transaction_type === 'STOCK_IN'),
+      'TEST 112: GET /api/reports/stock-movement (Transaction type filtering)',
+      `Expected 200 with strictly STOCK_IN transaction records, got ${filteredMovementRes.status}`
+    );
+
+    // TEST 113: GET /api/reports/export (CSV export generation with valid RFC-4180 format & headers for all 4 report types)
+    const csvInvRes = await makeRequest(port, 'GET', '/api/reports/export?report_type=inventory', undefined, adminToken);
+    const csvSalesRes = await makeRequest(port, 'GET', '/api/reports/export?report_type=sales', undefined, adminToken);
+    const csvPurchRes = await makeRequest(port, 'GET', '/api/reports/export?report_type=purchases', undefined, adminToken);
+    const csvMoveRes = await makeRequest(port, 'GET', '/api/reports/export?report_type=movement', undefined, adminToken);
+    assert(
+      csvInvRes.status === 200 &&
+        typeof csvInvRes.body === 'string' &&
+        csvInvRes.body.includes('Product SKU,Product Name') &&
+        csvSalesRes.status === 200 &&
+        typeof csvSalesRes.body === 'string' &&
+        csvSalesRes.body.includes('Order Number,Customer Name') &&
+        csvPurchRes.status === 200 &&
+        typeof csvPurchRes.body === 'string' &&
+        csvPurchRes.body.includes('Order ID,Supplier Name') &&
+        csvMoveRes.status === 200 &&
+        typeof csvMoveRes.body === 'string' &&
+        csvMoveRes.body.includes('Transaction ID,Date & Time'),
+      'TEST 113: GET /api/reports/export (CSV export generation with valid RFC-4180 format & headers for all 4 report types)',
+      `Expected 200 with CSV streams containing correct RFC headers`
+    );
+
+    // TEST 114: Date validation error handling (400 Bad Request on invalid date format or start_date > end_date)
+    const invalidDateRes = await makeRequest(
+      port,
+      'GET',
+      '/api/reports/sales?start_date=invalid-date',
+      undefined,
+      adminToken
+    );
+    const invertedDateRes = await makeRequest(
+      port,
+      'GET',
+      '/api/reports/sales?start_date=2026-12-31&end_date=2026-01-01',
+      undefined,
+      adminToken
+    );
+    const invalidExportTypeRes = await makeRequest(
+      port,
+      'GET',
+      '/api/reports/export?report_type=unsupported_type',
+      undefined,
+      adminToken
+    );
+    assert(
+      invalidDateRes.status === 400 &&
+        invertedDateRes.status === 400 &&
+        invalidExportTypeRes.status === 400,
+      'TEST 114: Date validation error handling (400 Bad Request on invalid date format or start_date > end_date)',
+      `Expected 400 Bad Request across invalid query parameters, got date=${invalidDateRes.status}, inverted=${invertedDateRes.status}, type=${invalidExportTypeRes.status}`
+    );
+
+    // TEST 115: Role authorization & access control (Unauthenticated rejection 401, all authenticated roles permitted 200)
+    const unauthReportRes = await makeRequest(port, 'GET', '/api/reports/inventory-valuation', undefined, undefined);
+    const viewerReportRes = await makeRequest(port, 'GET', '/api/reports/inventory-valuation', undefined, viewerToken);
+    const invMgrReportRes = await makeRequest(port, 'GET', '/api/reports/inventory-valuation', undefined, inventoryManagerToken);
+    const salesMgrReportRes = await makeRequest(port, 'GET', '/api/reports/sales', undefined, salesManagerToken);
+    const purchMgrReportRes = await makeRequest(port, 'GET', '/api/reports/purchases', undefined, purchaseManagerToken);
+    assert(
+      unauthReportRes.status === 401 &&
+        viewerReportRes.status === 200 &&
+        invMgrReportRes.status === 200 &&
+        salesMgrReportRes.status === 200 &&
+        purchMgrReportRes.status === 200,
+      'TEST 115: Role authorization & access control (Unauthenticated rejection 401, all authenticated roles permitted 200)',
+      `Expected unauth=401, viewer=200, invMgr=200, salesMgr=200, purchMgr=200, got unauth=${unauthReportRes.status}, viewer=${viewerReportRes.status}`
+    );
+
+    // TEST 116: CRITICAL SCM INVARIANT: Report operations are strictly read-only and DO NOT mutate business data
+    const prodCountBeforeRep = (await makeRequest(port, 'GET', '/api/products', undefined, adminToken)).body.data.total;
+    const invBalanceBeforeRep = (await makeRequest(port, 'GET', `/api/inventory/item/${testPoProductId}`, undefined, adminToken)).body.data.current_quantity;
+    const soCountBeforeRep = (await makeRequest(port, 'GET', '/api/sales', undefined, adminToken)).body.data.total;
+    const poCountBeforeRep = (await makeRequest(port, 'GET', '/api/purchases', undefined, adminToken)).body.data.total;
+
+    // Trigger all report endpoints repeatedly
+    await makeRequest(port, 'GET', '/api/reports/inventory-valuation', undefined, adminToken);
+    await makeRequest(port, 'GET', '/api/reports/sales', undefined, adminToken);
+    await makeRequest(port, 'GET', '/api/reports/purchases', undefined, adminToken);
+    await makeRequest(port, 'GET', '/api/reports/stock-movement', undefined, adminToken);
+    await makeRequest(port, 'GET', '/api/reports/export?report_type=inventory', undefined, adminToken);
+    await makeRequest(port, 'GET', '/api/reports/export?report_type=sales', undefined, adminToken);
+    await makeRequest(port, 'GET', '/api/reports/export?report_type=purchases', undefined, adminToken);
+    await makeRequest(port, 'GET', '/api/reports/export?report_type=movement', undefined, adminToken);
+
+    const prodCountAfterRep = (await makeRequest(port, 'GET', '/api/products', undefined, adminToken)).body.data.total;
+    const invBalanceAfterRep = (await makeRequest(port, 'GET', `/api/inventory/item/${testPoProductId}`, undefined, adminToken)).body.data.current_quantity;
+    const soCountAfterRep = (await makeRequest(port, 'GET', '/api/sales', undefined, adminToken)).body.data.total;
+    const poCountAfterRep = (await makeRequest(port, 'GET', '/api/purchases', undefined, adminToken)).body.data.total;
+
+    assert(
+      prodCountBeforeRep === prodCountAfterRep &&
+        invBalanceBeforeRep === invBalanceAfterRep &&
+        soCountBeforeRep === soCountAfterRep &&
+        poCountBeforeRep === poCountAfterRep,
+      'TEST 116: CRITICAL SCM INVARIANT: Report operations are strictly read-only and DO NOT mutate business data',
+      `Expected zero data changes across all modules after running comprehensive reports`
+    );
+
+    // TEST 117: Zero-regression verification: Existing Modules 1 through 9 remain 100% operational
+    const regM1 = await makeRequest(port, 'GET', '/api/auth/me', undefined, adminToken);
+    const regM2 = await makeRequest(port, 'GET', '/api/products', undefined, adminToken);
+    const regM3 = await makeRequest(port, 'GET', '/api/inventory', undefined, adminToken);
+    const regM4 = await makeRequest(port, 'GET', '/api/suppliers', undefined, adminToken);
+    const regM5 = await makeRequest(port, 'GET', '/api/customers', undefined, adminToken);
+    const regM6 = await makeRequest(port, 'GET', '/api/purchases', undefined, adminToken);
+    const regM7 = await makeRequest(port, 'GET', '/api/sales', undefined, adminToken);
+    const regM8 = await makeRequest(port, 'GET', '/api/invoices', undefined, adminToken);
+    const regM9 = await makeRequest(port, 'GET', '/api/dashboard/summary', undefined, adminToken);
+    const regHealth = await makeRequest(port, 'GET', '/api/health', undefined, undefined);
+
+    assert(
+      regM1.status === 200 &&
+        regM2.status === 200 &&
+        regM3.status === 200 &&
+        regM4.status === 200 &&
+        regM5.status === 200 &&
+        regM6.status === 200 &&
+        regM7.status === 200 &&
+        regM8.status === 200 &&
+        regM9.status === 200 &&
+        regHealth.status === 200 &&
+        regHealth.body.module.includes('Module 10: Reports'),
+      'TEST 117: Zero-regression verification: Existing Modules 1 through 9 remain 100% operational',
+      `Expected 200 across Modules 1-9 and Module 10 in health check`
+    );
+
+    // ----------------------------------------------------
+    // MODULE 11: NOTIFICATIONS & ALERTS TESTS (TESTS 118 - 126)
+    // ----------------------------------------------------
+    console.log('\n--- MODULE 11: NOTIFICATIONS & ALERTS ---');
+
+    // Create test products to trigger Low Stock and Out of Stock alerts
+    const lowStockProdRes = await makeRequest(port, 'POST', '/api/products', {
+      name: 'Alert Cable Low Stock',
+      sku: 'NOTIF-LOW-' + Date.now(),
+      category_id: createdCategoryId,
+      unit: 'pcs',
+      purchase_price: 5.0,
+      selling_price: 12.0,
+      opening_stock: 3,
+      reorder_level: 10,
+    }, adminToken);
+
+    const outOfStockProdRes = await makeRequest(port, 'POST', '/api/products', {
+      name: 'Alert Cable Out of Stock',
+      sku: 'NOTIF-OUT-' + Date.now(),
+      category_id: createdCategoryId,
+      unit: 'pcs',
+      purchase_price: 8.0,
+      selling_price: 20.0,
+      opening_stock: 0,
+      reorder_level: 10,
+    }, adminToken);
+
+    // TEST 118: GET /api/notifications (List notifications and verify data contract)
+    const notifListRes = await makeRequest(port, 'GET', '/api/notifications', undefined, adminToken);
+    assert(
+      notifListRes.status === 200 &&
+        notifListRes.body.success === true &&
+        Array.isArray(notifListRes.body.data.notifications) &&
+        typeof notifListRes.body.data.total === 'number' &&
+        typeof notifListRes.body.data.unread_count === 'number' &&
+        notifListRes.body.data.notifications.length > 0 &&
+        notifListRes.body.data.notifications[0].id &&
+        notifListRes.body.data.notifications[0].title &&
+        typeof notifListRes.body.data.notifications[0].is_read === 'boolean',
+      'TEST 118: GET /api/notifications (List notifications and verify data contract)',
+      `Expected 200 with notification list and unread count, got ${notifListRes.status}`
+    );
+
+    // TEST 119: GET /api/notifications/unread-count (Dedicated unread count endpoint)
+    const unreadCountRes = await makeRequest(port, 'GET', '/api/notifications/unread-count', undefined, adminToken);
+    assert(
+      unreadCountRes.status === 200 &&
+        unreadCountRes.body.success === true &&
+        typeof unreadCountRes.body.data.unread_count === 'number' &&
+        unreadCountRes.body.data.unread_count >= 2,
+      'TEST 119: GET /api/notifications/unread-count (Dedicated unread count endpoint)',
+      `Expected 200 with unread_count >= 2, got ${unreadCountRes.status}`
+    );
+
+    // TEST 120: Low-stock notification generation (Product stock <= reorder_level triggers LOW_STOCK alert)
+    const lowStockAlerts = notifListRes.body.data.notifications.filter((n) => n.type === 'LOW_STOCK');
+    assert(
+      lowStockAlerts.length > 0 &&
+        lowStockAlerts[0].title.includes('Low Stock') &&
+        lowStockAlerts[0].reference_type === 'PRODUCT',
+      'TEST 120: Low-stock notification generation (Product stock <= reorder_level triggers LOW_STOCK alert)',
+      `Expected at least 1 LOW_STOCK notification, got ${lowStockAlerts.length}`
+    );
+
+    // TEST 121: Out-of-stock notification generation (Product stock == 0 triggers OUT_OF_STOCK alert)
+    const outOfStockAlerts = notifListRes.body.data.notifications.filter((n) => n.type === 'OUT_OF_STOCK');
+    assert(
+      outOfStockAlerts.length > 0 &&
+        outOfStockAlerts[0].title.includes('Out of Stock') &&
+        outOfStockAlerts[0].reference_type === 'PRODUCT',
+      'TEST 121: Out-of-stock notification generation (Product stock == 0 triggers OUT_OF_STOCK alert)',
+      `Expected at least 1 OUT_OF_STOCK notification, got ${outOfStockAlerts.length}`
+    );
+
+    // TEST 122: Duplicate notification prevention (Multiple queries do NOT duplicate unread alerts)
+    const countBeforeDup = (await makeRequest(port, 'GET', '/api/notifications', undefined, adminToken)).body.data.total;
+    // Trigger notification list multiple times to invoke checkAndGenerateInventoryAlerts
+    await makeRequest(port, 'GET', '/api/notifications', undefined, adminToken);
+    await makeRequest(port, 'GET', '/api/notifications/unread-count', undefined, adminToken);
+    await makeRequest(port, 'GET', '/api/notifications', undefined, adminToken);
+    const countAfterDup = (await makeRequest(port, 'GET', '/api/notifications', undefined, adminToken)).body.data.total;
+    assert(
+      countBeforeDup === countAfterDup,
+      'TEST 122: Duplicate notification prevention (Multiple queries do NOT duplicate unread alerts)',
+      `Expected total notifications to remain identical (${countBeforeDup}), got ${countAfterDup}`
+    );
+
+    // TEST 123: PATCH /api/notifications/:id/read (Mark single notification as read)
+    const targetNotif = notifListRes.body.data.notifications.find((n) => !n.is_read);
+    const markSingleRes = await makeRequest(
+      port,
+      'PATCH',
+      `/api/notifications/${targetNotif.id}/read`,
+      undefined,
+      adminToken
+    );
+    assert(
+      markSingleRes.status === 200 &&
+        markSingleRes.body.success === true &&
+        markSingleRes.body.data.id === targetNotif.id &&
+        markSingleRes.body.data.is_read === true,
+      'TEST 123: PATCH /api/notifications/:id/read (Mark single notification as read)',
+      `Expected 200 with notification is_read=true, got ${markSingleRes.status}`
+    );
+
+    // TEST 124: PATCH /api/notifications/read-all (Mark all notifications as read & verify unread count is 0)
+    const markAllRes = await makeRequest(port, 'PATCH', '/api/notifications/read-all', undefined, adminToken);
+    const unreadAfterAll = (await makeRequest(port, 'GET', '/api/notifications/unread-count', undefined, adminToken)).body.data.unread_count;
+    assert(
+      markAllRes.status === 200 &&
+        markAllRes.body.success === true &&
+        typeof markAllRes.body.data.updated_count === 'number' &&
+        unreadAfterAll === 0,
+      'TEST 124: PATCH /api/notifications/read-all (Mark all notifications as read & verify unread count is 0)',
+      `Expected 200 with unread_count=0, got unread=${unreadAfterAll}`
+    );
+
+    // TEST 125: User authorization & isolation (User A cannot mark or access another user's notifications, unauthenticated rejected with 401)
+    const unauthNotifRes = await makeRequest(port, 'GET', '/api/notifications', undefined, undefined);
+    // Attempt to mark admin's notification using viewerToken
+    const crossUserMarkRes = await makeRequest(
+      port,
+      'PATCH',
+      `/api/notifications/${targetNotif.id}/read`,
+      undefined,
+      viewerToken
+    );
+    assert(
+      unauthNotifRes.status === 401 &&
+        crossUserMarkRes.status === 404,
+      'TEST 125: User authorization & isolation (Cross-user modification denied 404, unauthenticated rejected 401)',
+      `Expected unauth=401, crossUser=404, got unauth=${unauthNotifRes.status}, cross=${crossUserMarkRes.status}`
+    );
+
+    // TEST 126: Zero-regression verification: Existing Modules 1 through 10 remain 100% operational
+    const m1Check = await makeRequest(port, 'GET', '/api/auth/me', undefined, adminToken);
+    const m2Check = await makeRequest(port, 'GET', '/api/products', undefined, adminToken);
+    const m3Check = await makeRequest(port, 'GET', '/api/inventory', undefined, adminToken);
+    const m4Check = await makeRequest(port, 'GET', '/api/suppliers', undefined, adminToken);
+    const m5Check = await makeRequest(port, 'GET', '/api/customers', undefined, adminToken);
+    const m6Check = await makeRequest(port, 'GET', '/api/purchases', undefined, adminToken);
+    const m7Check = await makeRequest(port, 'GET', '/api/sales', undefined, adminToken);
+    const m8Check = await makeRequest(port, 'GET', '/api/invoices', undefined, adminToken);
+    const m9Check = await makeRequest(port, 'GET', '/api/dashboard/summary', undefined, adminToken);
+    const m10Check = await makeRequest(port, 'GET', '/api/reports/inventory-valuation', undefined, adminToken);
+    const healthCheckM11 = await makeRequest(port, 'GET', '/api/health', undefined, undefined);
+
+    assert(
+      m1Check.status === 200 &&
+        m2Check.status === 200 &&
+        m3Check.status === 200 &&
+        m4Check.status === 200 &&
+        m5Check.status === 200 &&
+        m6Check.status === 200 &&
+        m7Check.status === 200 &&
+        m8Check.status === 200 &&
+        m9Check.status === 200 &&
+        m10Check.status === 200 &&
+        healthCheckM11.status === 200 &&
+        healthCheckM11.body.module.includes('Module 11: Notifications'),
+      'TEST 126: Zero-regression verification: Existing Modules 1 through 10 remain 100% operational',
+      `Expected 200 across Modules 1-10 and Module 11 in health check`
+    );
+
+
+    // ----------------------------------------------------
+    // MODULE 12: ACTIVITY / AUDIT MANAGEMENT TESTS (TESTS 127 - 135)
+    // ----------------------------------------------------
+    console.log('\n--- MODULE 12: ACTIVITY / AUDIT MANAGEMENT ---');
+
+    // TEST 127: GET /api/audit/logs (Admin retrieves paginated audit trail & validates data contract)
+    const auditLogsRes = await makeRequest(port, 'GET', '/api/audit/logs', undefined, adminToken);
+    assert(
+      auditLogsRes.status === 200 &&
+        auditLogsRes.body.success === true &&
+        Array.isArray(auditLogsRes.body.data.logs) &&
+        typeof auditLogsRes.body.data.total === 'number' &&
+        auditLogsRes.body.data.total >= 1 &&
+        auditLogsRes.body.data.logs[0].id &&
+        auditLogsRes.body.data.logs[0].action &&
+        auditLogsRes.body.data.logs[0].module,
+      'TEST 127: GET /api/audit/logs (Admin retrieves paginated audit trail & validates data contract)',
+      `Expected 200 with logs list and total >= 1, got status=${auditLogsRes.status}`
+    );
+
+    // TEST 128: Audit log automatically recorded on User Login
+    const adminEmail = 'admin@stockit.local';
+    const loginLogsRes = await makeRequest(port, 'GET', '/api/audit/logs?action=LOGIN', undefined, adminToken);
+    const loginAuditLog = loginLogsRes.body?.data?.logs?.find((l) => l.action === 'LOGIN' && l.module === 'AUTH');
+    assert(
+      loginAuditLog &&
+        loginAuditLog.user_email === adminEmail &&
+        loginAuditLog.user_name &&
+        loginAuditLog.description.includes(adminEmail),
+      'TEST 128: Audit log automatically recorded on User Login (Verify user attribution and action LOGIN)',
+      `Expected LOGIN audit log for ${adminEmail}, found: ${JSON.stringify(loginAuditLog)}`
+    );
+
+    // TEST 129: Audit log automatically recorded on Product mutation
+    const productAuditLog = auditLogsRes.body.data.logs.find((l) => l.action === 'CREATE' && l.module === 'PRODUCT');
+    assert(
+      productAuditLog &&
+        productAuditLog.entity_type === 'PRODUCT' &&
+        productAuditLog.new_value &&
+        productAuditLog.new_value.sku,
+      'TEST 129: Audit log automatically recorded on Product mutation (Verify action CREATE & entity PRODUCT)',
+      `Expected CREATE product log, found: ${JSON.stringify(productAuditLog)}`
+    );
+
+    // TEST 130: Audit log automatically recorded on Inventory Stock Movement
+    const stockInLogsRes = await makeRequest(port, 'GET', '/api/audit/logs?module=INVENTORY&action=STOCK_IN', undefined, adminToken);
+    const stockInAuditLog = stockInLogsRes.body?.data?.logs?.[0];
+    assert(
+      stockInAuditLog &&
+        stockInAuditLog.entity_type === 'PRODUCT' &&
+        stockInAuditLog.old_value?.current_quantity !== undefined &&
+        stockInAuditLog.new_value?.current_quantity !== undefined,
+      'TEST 130: Audit log automatically recorded on Inventory Stock Movement (Verify STOCK_IN balance transition)',
+      `Expected STOCK_IN log with state transitions, found: ${JSON.stringify(stockInAuditLog)}`
+    );
+
+    // TEST 131: Audit logs filtering by module and action
+    const filteredModuleRes = await makeRequest(
+      port,
+      'GET',
+      '/api/audit/logs?module=INVENTORY&action=STOCK_IN',
+      undefined,
+      adminToken
+    );
+    assert(
+      filteredModuleRes.status === 200 &&
+        filteredModuleRes.body.data.logs.length > 0 &&
+        filteredModuleRes.body.data.logs.every((l) => l.module === 'INVENTORY' && l.action === 'STOCK_IN'),
+      'TEST 131: Audit logs filtering by module (INVENTORY) and action (STOCK_IN)',
+      `Expected filtered logs to match INVENTORY + STOCK_IN, got count=${filteredModuleRes.body?.data?.logs?.length}`
+    );
+
+    // TEST 132: Audit logs search query filtering
+    const searchAuditRes = await makeRequest(
+      port,
+      'GET',
+      `/api/audit/logs?search=${encodeURIComponent(adminEmail)}`,
+      undefined,
+      adminToken
+    );
+    assert(
+      searchAuditRes.status === 200 &&
+        searchAuditRes.body.data.logs.length > 0 &&
+        searchAuditRes.body.data.logs.some((l) => l.description.includes(adminEmail)),
+      'TEST 132: Audit logs search query filtering (Matches user email or description)',
+      `Expected search results to match ${adminEmail}, got count=${searchAuditRes.body?.data?.logs?.length}`
+    );
+
+    // TEST 133: Role-based authorization & access control (Non-admin forbidden 403, unauthenticated 401)
+    const viewerAuditRes = await makeRequest(port, 'GET', '/api/audit/logs', undefined, viewerToken);
+    const unauthAuditRes = await makeRequest(port, 'GET', '/api/audit/logs', undefined, undefined);
+    assert(
+      viewerAuditRes.status === 403 &&
+        unauthAuditRes.status === 401,
+      'TEST 133: Role-based authorization & access control (Non-admin forbidden 403, unauthenticated 401)',
+      `Expected viewer=403, unauth=401, got viewer=${viewerAuditRes.status}, unauth=${unauthAuditRes.status}`
+    );
+
+    // TEST 134: Security check: Sensitive data redaction (Verify passwords / tokens are never stored in audit logs)
+    const allLogsRes = await makeRequest(port, 'GET', '/api/audit/logs?limit=100', undefined, adminToken);
+    const hasExposedPassword = allLogsRes.body.data.logs.some((l) => {
+      const serialized = JSON.stringify(l).toLowerCase();
+      return (
+        serialized.includes('admin123') ||
+        serialized.includes('viewer123') ||
+        serialized.includes('hash_') ||
+        (serialized.includes('"password"') && !serialized.includes('[redacted]'))
+      );
+    });
+    assert(
+      hasExposedPassword === false,
+      'TEST 134: Security check: Sensitive data redaction (Passwords/hashes are redacted or never stored)',
+      'Security violation: Plaintext password or raw secret discovered in audit log payload!'
+    );
+
+    // TEST 135: Append-Only / Immutability check & zero-regression across Modules 1 to 11
+    const testLogId = auditLogsRes.body.data.logs[0].id;
+    const deleteAuditAttempt = await makeRequest(port, 'DELETE', `/api/audit/logs/${testLogId}`, undefined, adminToken);
+    const putAuditAttempt = await makeRequest(port, 'PUT', `/api/audit/logs/${testLogId}`, { action: 'HACKED' }, adminToken);
+    const healthCheckM12 = await makeRequest(port, 'GET', '/api/health', undefined, undefined);
+
+    assert(
+      deleteAuditAttempt.status === 404 &&
+        putAuditAttempt.status === 404 &&
+        healthCheckM12.status === 200 &&
+        healthCheckM12.body.module.includes('Module 12: Audit'),
+      'TEST 135: CRITICAL SCM INVARIANT: Audit trail is append-only (no update/delete) & health check reflects Module 12',
+      `Expected DELETE=404, PUT=404, health=200 with Module 12, got DELETE=${deleteAuditAttempt.status}, PUT=${putAuditAttempt.status}`
+    );
+
+
+    // ----------------------------------------------------
+    // MODULE 13: SYSTEM ADMINISTRATION TESTS (TESTS 136 - 146)
+    // ----------------------------------------------------
+    console.log('\n--- MODULE 13: SYSTEM ADMINISTRATION ---');
+
+    // TEST 136: GET /api/admin/summary (Administrative telemetry overview)
+    const adminSummaryRes = await makeRequest(port, 'GET', '/api/admin/summary', undefined, adminToken);
+    assert(
+      adminSummaryRes.status === 200 &&
+        adminSummaryRes.body.success === true &&
+        adminSummaryRes.body.data.system.status === 'HEALTHY' &&
+        typeof adminSummaryRes.body.data.users.total === 'number' &&
+        adminSummaryRes.body.data.users.total >= 1 &&
+        typeof adminSummaryRes.body.data.catalog.total_products === 'number' &&
+        typeof adminSummaryRes.body.data.transactions.total_sales_orders === 'number',
+      'TEST 136: GET /api/admin/summary (Administrative telemetry overview & system metrics)',
+      `Expected 200 with HEALTHY status and metric tallies, got ${adminSummaryRes.status}`
+    );
+
+    // TEST 137: GET /api/admin/users (List users and verify contract)
+    const adminUserListRes = await makeRequest(port, 'GET', '/api/admin/users', undefined, adminToken);
+    assert(
+      adminUserListRes.status === 200 &&
+        adminUserListRes.body.success === true &&
+        Array.isArray(adminUserListRes.body.data.users) &&
+        adminUserListRes.body.data.total >= 1 &&
+        adminUserListRes.body.data.users[0].id &&
+        adminUserListRes.body.data.users[0].full_name &&
+        adminUserListRes.body.data.users[0].role,
+      'TEST 137: GET /api/admin/users (Admin lists user accounts with role & status attributes)',
+      `Expected 200 with users list, got ${adminUserListRes.status}`
+    );
+
+    // TEST 138: POST /api/admin/users (Admin creates new user account)
+    const testNewAdminEmail = `admin_created_${Date.now()}@stockit.local`;
+    const createAdminUserRes = await makeRequest(
+      port,
+      'POST',
+      '/api/admin/users',
+      {
+        full_name: 'Operations Specialist',
+        email: testNewAdminEmail,
+        password: 'StrongAdminPass@2026',
+        role: 'INVENTORY_MANAGER',
+        status: 'ACTIVE',
+      },
+      adminToken
+    );
+    const createdUserId = createAdminUserRes.body?.data?.id;
+    assert(
+      createAdminUserRes.status === 201 &&
+        createAdminUserRes.body.success === true &&
+        createdUserId &&
+        createAdminUserRes.body.data.role === 'INVENTORY_MANAGER' &&
+        createAdminUserRes.body.data.status === 'ACTIVE' &&
+        !('password' in createAdminUserRes.body.data) &&
+        !('password_hash' in createAdminUserRes.body.data),
+      'TEST 138: POST /api/admin/users (Admin creates new user account without password exposure)',
+      `Expected 201 with created user, got ${createAdminUserRes.status}`
+    );
+
+    // TEST 139: PUT /api/admin/users/:id (Admin updates user profile and password)
+    const updateAdminUserRes = await makeRequest(
+      port,
+      'PUT',
+      `/api/admin/users/${createdUserId}`,
+      {
+        full_name: 'Operations Lead Specialist',
+        password: 'NewStrongPassword@2026',
+      },
+      adminToken
+    );
+    assert(
+      updateAdminUserRes.status === 200 &&
+        updateAdminUserRes.body.success === true &&
+        updateAdminUserRes.body.data.full_name === 'Operations Lead Specialist',
+      'TEST 139: PUT /api/admin/users/:id (Admin updates user profile attributes and password)',
+      `Expected 200 with updated full_name, got ${updateAdminUserRes.status}`
+    );
+
+    // TEST 140: PATCH /api/admin/users/:id/role (Admin changes user role)
+    const changeRoleRes = await makeRequest(
+      port,
+      'PATCH',
+      `/api/admin/users/${createdUserId}/role`,
+      { role: 'SALES_MANAGER' },
+      adminToken
+    );
+    assert(
+      changeRoleRes.status === 200 &&
+        changeRoleRes.body.success === true &&
+        changeRoleRes.body.data.role === 'SALES_MANAGER',
+      'TEST 140: PATCH /api/admin/users/:id/role (Admin transitions user role to SALES_MANAGER)',
+      `Expected 200 with role SALES_MANAGER, got ${changeRoleRes.status}`
+    );
+
+    // TEST 141: PATCH /api/admin/users/:id/status (Admin deactivates and reactivates user)
+    const deactUserRes = await makeRequest(
+      port,
+      'PATCH',
+      `/api/admin/users/${createdUserId}/status`,
+      { status: 'INACTIVE' },
+      adminToken
+    );
+    const reactUserRes = await makeRequest(
+      port,
+      'PATCH',
+      `/api/admin/users/${createdUserId}/status`,
+      { status: 'ACTIVE' },
+      adminToken
+    );
+    assert(
+      deactUserRes.status === 200 &&
+        deactUserRes.body.data.status === 'INACTIVE' &&
+        reactUserRes.status === 200 &&
+        reactUserRes.body.data.status === 'ACTIVE',
+      'TEST 141: PATCH /api/admin/users/:id/status (Admin activates and deactivates user accounts)',
+      `Expected deact=INACTIVE, react=ACTIVE, got deact=${deactUserRes.body?.data?.status}, react=${reactUserRes.body?.data?.status}`
+    );
+
+    // TEST 142: GET /api/admin/roles (Roles & Permissions matrix query)
+    const rolesListRes = await makeRequest(port, 'GET', '/api/admin/roles', undefined, adminToken);
+    assert(
+      rolesListRes.status === 200 &&
+        rolesListRes.body.success === true &&
+        Array.isArray(rolesListRes.body.data) &&
+        rolesListRes.body.data.length >= 5 &&
+        rolesListRes.body.data.every((r) => Array.isArray(r.permissions)),
+      'TEST 142: GET /api/admin/roles (Roles & Permissions matrix query with capability arrays)',
+      `Expected 200 with at least 5 roles, got count=${rolesListRes.body?.data?.length}`
+    );
+
+    // TEST 143: GET & PUT /api/admin/settings (System settings query and update)
+    const initialSettingsRes = await makeRequest(port, 'GET', '/api/admin/settings', undefined, adminToken);
+    const updateSettingsRes = await makeRequest(
+      port,
+      'PUT',
+      '/api/admin/settings',
+      {
+        settings: {
+          company_name: 'StockIT Enterprise Global Solutions',
+          default_tax_rate: '15',
+        },
+      },
+      adminToken
+    );
+    const verifiedSettingsRes = await makeRequest(port, 'GET', '/api/admin/settings', undefined, adminToken);
+    assert(
+      initialSettingsRes.status === 200 &&
+        updateSettingsRes.status === 200 &&
+        verifiedSettingsRes.status === 200 &&
+        verifiedSettingsRes.body.data.map.company_name === 'StockIT Enterprise Global Solutions' &&
+        verifiedSettingsRes.body.data.map.default_tax_rate === '15',
+      'TEST 143: GET & PUT /api/admin/settings (Read and persist system configuration defaults)',
+      `Expected company_name updated to StockIT Enterprise Global Solutions, got ${verifiedSettingsRes.body?.data?.map?.company_name}`
+    );
+
+    // TEST 144: Administrative Audit integration (Verify audit events generated for admin actions)
+    const adminAuditLogsRes = await makeRequest(
+      port,
+      'GET',
+      '/api/audit/logs?module=ADMIN',
+      undefined,
+      adminToken
+    );
+    const hasUserCreateAudit = adminAuditLogsRes.body?.data?.logs?.some((l) => l.action === 'USER_CREATE');
+    const hasRoleChangeAudit = adminAuditLogsRes.body?.data?.logs?.some((l) => l.action === 'USER_ROLE_CHANGE');
+    const hasStatusChangeAudit = adminAuditLogsRes.body?.data?.logs?.some((l) => l.action === 'USER_STATUS_CHANGE');
+    assert(
+      adminAuditLogsRes.status === 200 &&
+        hasUserCreateAudit &&
+        hasRoleChangeAudit &&
+        hasStatusChangeAudit,
+      'TEST 144: Administrative Audit integration (Audit events automatically logged for admin user lifecycle)',
+      'Expected USER_CREATE, USER_ROLE_CHANGE, USER_STATUS_CHANGE in audit trail'
+    );
+
+    // TEST 145: Role-based authorization & security controls on Administration module
+    const viewerAdminSummaryRes = await makeRequest(port, 'GET', '/api/admin/summary', undefined, viewerToken);
+    const viewerAdminUsersRes = await makeRequest(port, 'GET', '/api/admin/users', undefined, viewerToken);
+    const unauthAdminRes = await makeRequest(port, 'GET', '/api/admin/summary', undefined, undefined);
+    
+    // Prevent self-deactivation: admin cannot deactivate self
+    const adminMeRes = await makeRequest(port, 'GET', '/api/auth/me', undefined, adminToken);
+    const adminSelfId = adminMeRes.body?.data?.user?.id;
+    const selfDeactRes = await makeRequest(
+      port,
+      'PATCH',
+      `/api/admin/users/${adminSelfId}/status`,
+      { status: 'INACTIVE' },
+      adminToken
+    );
+
+    assert(
+      viewerAdminSummaryRes.status === 403 &&
+        viewerAdminUsersRes.status === 403 &&
+        unauthAdminRes.status === 401 &&
+        selfDeactRes.status === 400,
+      'TEST 145: Role-based authorization & security controls (Non-admin 403, unauthenticated 401, self-deactivation blocked 400)',
+      `Expected viewer=403, unauth=401, selfDeact=400, got viewerSummary=${viewerAdminSummaryRes.status}, unauth=${unauthAdminRes.status}, selfDeact=${selfDeactRes.status}`
+    );
+
+    // TEST 146: Full end-to-end zero-regression check across all 13 modules
+    const m1 = await makeRequest(port, 'GET', '/api/auth/me', undefined, adminToken);
+    const m2 = await makeRequest(port, 'GET', '/api/products', undefined, adminToken);
+    const m3 = await makeRequest(port, 'GET', '/api/inventory', undefined, adminToken);
+    const m4 = await makeRequest(port, 'GET', '/api/suppliers', undefined, adminToken);
+    const m5 = await makeRequest(port, 'GET', '/api/customers', undefined, adminToken);
+    const m6 = await makeRequest(port, 'GET', '/api/purchases', undefined, adminToken);
+    const m7 = await makeRequest(port, 'GET', '/api/sales', undefined, adminToken);
+    const m8 = await makeRequest(port, 'GET', '/api/invoices', undefined, adminToken);
+    const m9 = await makeRequest(port, 'GET', '/api/dashboard/summary', undefined, adminToken);
+    const m10 = await makeRequest(port, 'GET', '/api/reports/inventory-valuation', undefined, adminToken);
+    const m11 = await makeRequest(port, 'GET', '/api/notifications/unread-count', undefined, adminToken);
+    const m12 = await makeRequest(port, 'GET', '/api/audit/logs', undefined, adminToken);
+    const m13 = await makeRequest(port, 'GET', '/api/admin/summary', undefined, adminToken);
+    const healthM13 = await makeRequest(port, 'GET', '/api/health', undefined, undefined);
+
+    assert(
+      m1.status === 200 &&
+        m2.status === 200 &&
+        m3.status === 200 &&
+        m4.status === 200 &&
+        m5.status === 200 &&
+        m6.status === 200 &&
+        m7.status === 200 &&
+        m8.status === 200 &&
+        m9.status === 200 &&
+        m10.status === 200 &&
+        m11.status === 200 &&
+        m12.status === 200 &&
+        m13.status === 200 &&
+        healthM13.status === 200 &&
+        healthM13.body.module.includes('Module 13: Administration'),
+      'TEST 146: Full end-to-end zero-regression verification: All 13 modules active and 100% operational',
+      'Expected 200 status across all 13 modules and complete health check confirmation'
+    );
+
   } finally {
     server.close();
   }

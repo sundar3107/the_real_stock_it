@@ -84,7 +84,8 @@ export class PurchaseController {
     try {
       const id = req.params.id as string;
       const { status } = req.body;
-      const updated = PurchaseService.updateStatus(id, status);
+      const userId = (req as any).user?.userId || 'usr_unknown';
+      const updated = PurchaseService.updateStatus(id, status, userId);
       res.status(200).json({
         success: true,
         message: `Purchase order status changed to '${status}'.`,

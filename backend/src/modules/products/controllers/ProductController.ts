@@ -1,4 +1,4 @@
-﻿import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { ProductService } from '../services/ProductService';
 import { IProductFilterQuery } from '../types/product.types';
 
@@ -41,7 +41,7 @@ export class ProductController {
 
   static create(req: Request, res: Response, next: NextFunction): void {
     try {
-      const product = ProductService.createProduct(req.body);
+      const product = ProductService.createProduct(req.body, req.user?.userId);
       res.status(201).json({
         success: true,
         message: 'Product created successfully',
@@ -55,7 +55,7 @@ export class ProductController {
   static update(req: Request, res: Response, next: NextFunction): void {
     try {
       const productId = req.params.id as string;
-      const product = ProductService.updateProduct(productId, req.body);
+      const product = ProductService.updateProduct(productId, req.body, req.user?.userId);
       res.status(200).json({
         success: true,
         message: 'Product updated successfully',
@@ -69,7 +69,7 @@ export class ProductController {
   static delete(req: Request, res: Response, next: NextFunction): void {
     try {
       const productId = req.params.id as string;
-      const product = ProductService.deactivateProduct(productId);
+      const product = ProductService.deactivateProduct(productId, req.user?.userId);
       res.status(200).json({
         success: true,
         message: 'Product deactivated successfully',

@@ -481,6 +481,98 @@ export function runMigrations() {
       }
       console.log('[DB] Standard commercial invoice seeded.');
     }
+
+    // 10. Seed initial system notification if none exist
+    const countNotifStmt = db.prepare('SELECT COUNT(*) as count FROM notifications');
+    const notifResult = countNotifStmt.get() as any;
+    const notifCount = notifResult ? notifResult.count : 0;
+
+    if (notifCount === 0) {
+      const adminRow = db.prepare("SELECT id FROM users WHERE email = 'admin@stockit.local'").get() as any;
+      if (adminRow) {
+        db.prepare(`
+          INSERT INTO notifications (
+            id, user_id, type, title, message, reference_type, reference_id, is_read, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, datetime('now'))
+        `).run(
+          'notif_seed_001',
+          adminRow.id,
+          'SYSTEM',
+          'Welcome to StockIT SCM',
+          'Stock Management System initialized successfully. Real-time alert notifications active.',
+          'SYSTEM',
+          null
+        );
+        console.log('[DB] Standard initial notifications seeded.');
+      }
+    }
+
+    // 11. Seed initial system audit log if none exist
+    const countAuditStmt = db.prepare('SELECT COUNT(*) as count FROM activity_logs');
+    const auditResult = countAuditStmt.get() as any;
+    const auditCount = auditResult ? auditResult.count : 0;
+
+    if (auditCount === 0) {
+      const adminRow = db.prepare("SELECT id FROM users WHERE email = 'admin@stockit.local'").get();
+      const adminId = adminRow ? adminRow.id : null;
+      db.prepare(`
+        INSERT INTO activity_logs (
+          id, user_id, action, module, entity_type, entity_id, description, metadata, timestamp
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      `).run(
+        'audit_seed_001',
+        adminId,
+        'SYSTEM_INIT',
+        'SYSTEM',
+        'SYSTEM',
+        'sys_001',
+        'System database baseline initialized with core SCM schemas and initial records.',
+        JSON.stringify({ component: 'DatabaseMigrate', version: '2.2.0' })
+      );
+      console.log('[DB] Standard initial activity audit log seeded.');
+    }
+
+    // 12. Seed default system settings if none exist (Module 13: System Administration)
+    const countSettingsStmt = db.prepare('SELECT COUNT(*) as count FROM system_settings');
+    const settingsResult = countSettingsStmt.get() as any;
+    const settingsCount = settingsResult ? settingsResult.count : 0;
+
+    if (settingsCount === 0) {
+      console.log('[DB] No system settings found. Seeding default configuration...');
+      const adminRow = db.prepare("SELECT id FROM users WHERE email = 'admin@stockit.local'").get() as any;
+      const adminId = adminRow ? adminRow.id : null;
+
+      const initialSettings = [
+        { key: 'app_name', value: 'StockIT - Stock Management System', category: 'GENERAL', desc: 'Application brand and system header title' },
+        { key: 'company_name', value: 'StockIT Enterprises Ltd.', category: 'COMPANY', desc: 'Legal registered business entity name' },
+        { key: 'company_address', value: 'Plot 42, Tech Innovation Corridor, Bangalore, KA, India', category: 'COMPANY', desc: 'Registered headquarters address' },
+        { key: 'contact_email', value: 'support@stockit.local', category: 'COMPANY', desc: 'System administrator and business contact email' },
+        { key: 'contact_phone', value: '+91 80 4123 4567', category: 'COMPANY', desc: 'Primary customer and supplier support hotline' },
+        { key: 'default_currency', value: 'USD', category: 'FINANCIAL', desc: 'Primary currency code (USD, EUR, INR, GBP)' },
+        { key: 'default_tax_rate', value: '18', category: 'FINANCIAL', desc: 'Standard system tax percentage applied on orders and invoices' },
+        { key: 'date_format', value: 'YYYY-MM-DD', category: 'GENERAL', desc: 'Standard display date format across system interfaces' },
+        { key: 'low_stock_threshold_default', value: '10', category: 'INVENTORY', desc: 'Default product reorder alert threshold units' },
+      ];
+
+      const insertSettingStmt = db.prepare(`
+        INSERT INTO system_settings (
+          id, setting_key, setting_value, category, description, updated_by, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+      `);
+
+      for (let i = 0; i < initialSettings.length; i++) {
+        const s = initialSettings[i];
+        insertSettingStmt.run(
+          `setting_${String(i + 1).padStart(3, '0')}`,
+          s.key,
+          s.value,
+          s.category,
+          s.desc,
+          adminId
+        );
+      }
+      console.log('[DB] Default system settings seeded.');
+    }
   }
 }
 
